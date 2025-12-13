@@ -45,8 +45,8 @@ Este documento contiene todas las mejoras, ideas y funcionalidades propuestas pa
 - ✅ **Notas Post-Operación**: Qué salió bien, qué salió mal, lecciones aprendidas (COMPLETADO)
 - ✅ **Sistema de Tags**: Etiquetas personalizables (ej: "breakout", "reversal", "news", "FOMO") (COMPLETADO)
 - ✅ **Emociones Registradas**: Selector de estado emocional (confiado, ansioso, temeroso, etc.) (COMPLETADO)
-- ⚠️ **Screenshots/Gráficos**: Upload real de imágenes de gráficos, setups, análisis (ESTRUCTURA LISTA, falta implementar upload real)
-- ⚠️ **Videos**: Enlaces a grabaciones de pantalla de la operación (ESTRUCTURA LISTA, falta validación de URLs)
+- ✅ **Screenshots/Gráficos**: Upload real de imágenes con drag & drop, validación de tamaño, preview mejorado (COMPLETADO)
+- ✅ **Videos**: Enlaces a videos con validación robusta (YouTube, Vimeo, URLs, archivos locales), feedback visual (COMPLETADO)
 
 #### 1.2 Plantillas de Journal
 - Plantillas predefinidas para diferentes estrategias

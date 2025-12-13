@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   TrendingUp, 
@@ -13,11 +13,14 @@ import {
   LineChart,
   Calendar,
   User,
-  Lightbulb
+  Lightbulb,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSwipe } from '@/hooks/useSwipe';
+import { useAuthStore } from '@/store/authStore';
+import { Logo } from '@/components/landing/Logo';
 
 const navigation = [
   { name: 'Panel', href: '/', icon: LayoutDashboard },
@@ -40,6 +43,17 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileToggle }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout, user } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+    // Cerrar menú móvil si está abierto
+    if (isMobileOpen) {
+      onMobileToggle();
+    }
+  };
 
   // Gestos táctiles para cerrar el menú
   const swipeHandlers = useSwipe({
@@ -60,7 +74,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileToggle }
   const sidebarContent = (
     <>
       <div className="flex h-16 items-center justify-between border-b px-6">
-        <h1 className="text-xl font-bold">Registro de Trading</h1>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8">
+            <Logo />
+          </div>
+          <h1 className="text-xl font-bold">ALGO TSX</h1>
+        </div>
         <button
           onClick={onMobileToggle}
           className="md:hidden p-2 rounded-md hover:bg-accent transition-colors"
@@ -97,6 +116,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileToggle }
           );
         })}
       </nav>
+      
+      {/* User info and logout */}
+      <div className="border-t p-4 space-y-2">
+        {user && (
+          <div className="px-3 py-2 text-xs text-muted-foreground truncate">
+            {user}
+          </div>
+        )}
+        <button
+          onClick={handleLogout}
+          className={cn(
+            'w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors touch-manipulation',
+            'text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:bg-destructive/20'
+          )}
+        >
+          <LogOut className="h-5 w-5 flex-shrink-0" />
+          <span>Cerrar Sesión</span>
+        </button>
+      </div>
     </>
   );
 
