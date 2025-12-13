@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { getCareerKPIs, type CareerKPI } from '@/lib/careerStats';
+import { getCareerKPIs } from '@/lib/careerStats';
 import { formatCurrency } from '@/lib/utils';
 import type { Trade } from '@/types/Trading';
 import { Clock, TrendingUp, Calendar, DollarSign } from 'lucide-react';

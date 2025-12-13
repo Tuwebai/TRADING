@@ -4,16 +4,16 @@ import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { X } from 'lucide-react';
-import type { TradeFilters } from '@/types/Trading';
+import type { TradeFilters as TradeFiltersType } from '@/types/Trading';
 
 interface TradeFiltersProps {
-  filters: TradeFilters;
-  onFiltersChange: (filters: Partial<TradeFilters>) => void;
+  filters: TradeFiltersType;
+  onFiltersChange: (filters: Partial<TradeFiltersType>) => void;
   onClearFilters: () => void;
   uniqueAssets: string[];
 }
 
-export const TradeFilters: React.FC<TradeFiltersProps> = ({
+export const TradeFiltersComponent: React.FC<TradeFiltersProps> = ({
   filters,
   onFiltersChange,
   onClearFilters,

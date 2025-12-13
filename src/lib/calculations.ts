@@ -5,7 +5,7 @@
  * and consistency across the application.
  */
 
-import type { Trade, PositionType } from '@/types/Trading';
+import type { Trade } from '@/types/Trading';
 
 /**
  * Calculate Profit and Loss (PnL) for a trade

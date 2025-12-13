@@ -314,10 +314,6 @@ export function getAchievements(trades: Trade[]): Achievement[] {
   // Check for "10 Green Days in a Row"
   let greenStreak = 0;
   let maxGreenStreak = 0;
-  const sortedDays = Array.from(dayMap.values()).sort((a, b) => {
-    // We need to sort by date, but for simplicity we'll check the streak
-    return 0;
-  });
   
   // For simplicity, check all days
   Array.from(dayMap.values()).forEach(pnl => {
@@ -358,16 +354,7 @@ export function getAchievements(trades: Trade[]): Achievement[] {
   
   // Check for "20R Month" (20x risk in a month)
   // This requires calculating R multiples - simplified version
-  const monthMap = new Map<string, number>();
-  closedTrades.forEach(trade => {
-    const date = new Date(trade.exitDate!);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const currentPnl = monthMap.get(monthKey) || 0;
-    monthMap.set(monthKey, currentPnl + (trade.pnl || 0));
-  });
-  
   // For 20R, we'd need to know the risk per trade. Simplified: check if any month has very high P/L
-  const maxMonthPnl = Math.max(...Array.from(monthMap.values()), 0);
   // Assuming average risk is 1% of account, 20R would be 20% of account
   // This is a simplified check - in reality you'd calculate R multiples
   achievements.push({

@@ -5,7 +5,7 @@
 
 import type { Trade } from '@/types/Trading';
 import { calculateAnalytics } from './calculations';
-import { getTradesByMonth, getTotalPLPerDay } from './calendarStats';
+import { getTradesByMonth } from './calendarStats';
 import { generateEquityCurve, calculateMaxDrawdown } from './calculations';
 import { calculateHourlyPerformance } from './temporalAnalysis';
 

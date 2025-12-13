@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { getDashboardInsights, type DashboardInsight } from '@/lib/dashboardInsights';
 import type { Trade } from '@/types/Trading';
-import { AlertTriangle, Clock, TrendingDown, Info, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';

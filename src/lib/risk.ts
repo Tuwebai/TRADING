@@ -206,7 +206,7 @@ export function getRiskMetrics(
  */
 export function getRiskWarnings(
   metrics: RiskMetrics,
-  settings: Settings
+  _settings: Settings
 ): RiskWarning[] {
   const warnings: RiskWarning[] = [];
   

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { getAchievements, type Achievement } from '@/lib/careerStats';
+import { getAchievements } from '@/lib/careerStats';
 import type { Trade } from '@/types/Trading';
 import { Trophy, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';

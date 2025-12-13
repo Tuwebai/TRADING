@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ThemeEditor } from '@/components/settings/ThemeEditor';
 import { AdvancedSettingsComponent } from '@/components/settings/AdvancedSettings';
 import { useSettingsStore } from '@/store/settingsStore';
-import type { ThemeName, ThemeConfig, AdvancedSettings } from '@/types/Trading';
+import type { ThemeName, ThemeConfig } from '@/types/Trading';
 
 const currencies = [
   'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY', 'BTC', 'ETH',

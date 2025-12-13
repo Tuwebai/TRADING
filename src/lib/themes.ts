@@ -114,7 +114,7 @@ export function applyTheme(themeName: ThemeName, customTheme: ThemeConfig | null
                  (themeName === 'custom' && customTheme && 
                   parseInt(customTheme.background.split(' ')[2] || '100') < 50);
   
-  root.classList.toggle('dark', isDark);
+  root.classList.toggle('dark', isDark ?? false);
 }
 
 /**

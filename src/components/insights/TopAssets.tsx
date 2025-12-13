@@ -103,7 +103,7 @@ export const TopAssets: React.FC<TopAssetsProps> = ({ trades, baseCurrency }) =>
                 key={asset.asset}
                 rank={index + 1}
                 asset={asset.asset}
-                value={asset.avgR.toFixed(2)}R
+                value={`${asset.avgR.toFixed(2)}R`}
                 label={`${asset.trades} operaciones`}
                 icon={<TrendingUp className="h-4 w-4" />}
               />

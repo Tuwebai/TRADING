@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ImageIcon, Video, Tag } from 'lucide-react';
 import type { Trade } from '@/types/Trading';
-import { formatDate } from '@/lib/utils';
 
 interface TradeJournalViewProps {
   trade: Trade;

@@ -7,7 +7,7 @@ import { TopAssets } from '@/components/insights/TopAssets';
 import { TimingHeatmap } from '@/components/insights/TimingHeatmap';
 import { motion } from 'framer-motion';
 import { Lightbulb } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 
 export const InsightsPage = () => {
   const { trades, loadTrades, isLoading } = useTradeStore();

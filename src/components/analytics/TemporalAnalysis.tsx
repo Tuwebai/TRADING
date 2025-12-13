@@ -30,20 +30,22 @@ export const TemporalAnalysis: React.FC<TemporalAnalysisProps> = ({ trades, base
     current.totalPnl > best.totalPnl ? current : best, 
     hourlyData[0] || { hour: 0, totalPnl: 0 }
   );
-  const worstHour = hourlyData.reduce((worst, current) => 
-    current.totalPnl < worst.totalPnl ? current : worst, 
-    hourlyData[0] || { hour: 0, totalPnl: 0 }
-  );
+  // worstHour is calculated but not used in display - keeping for potential future use
+  // const worstHour = hourlyData.reduce((worst, current) => 
+  //   current.totalPnl < worst.totalPnl ? current : worst, 
+  //   hourlyData[0] || { hour: 0, totalPnl: 0 }
+  // );
 
   // Find best/worst days
   const bestDay = dailyData.reduce((best, current) => 
     current.totalPnl > best.totalPnl ? current : best, 
     dailyData[0] || { day: 0, totalPnl: 0 }
   );
-  const worstDay = dailyData.reduce((worst, current) => 
-    current.totalPnl < worst.totalPnl ? current : worst, 
-    dailyData[0] || { day: 0, totalPnl: 0 }
-  );
+  // worstDay calculated but not displayed - keeping for potential future use
+  // const worstDay = dailyData.reduce((worst, current) => 
+  //   current.totalPnl < worst.totalPnl ? current : worst, 
+  //   dailyData[0] || { day: 0, totalPnl: 0 }
+  // );
 
   return (
     <div className="space-y-6">

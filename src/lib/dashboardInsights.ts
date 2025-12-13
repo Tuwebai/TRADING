@@ -6,7 +6,7 @@
 import type { Trade } from '@/types/Trading';
 import { calculateHourlyPerformance, calculateDailyPerformance } from './temporalAnalysis';
 import { getTopAssets } from './insights';
-import { calculateAnalytics, calculateMaxWinStreak, calculateMaxLossStreak } from './calculations';
+import { calculateAnalytics } from './calculations';
 import { getRiskMetrics } from './risk';
 import type { Settings } from '@/types/Trading';
 
@@ -113,7 +113,6 @@ export function getBestHourInsight(trades: Trade[]): DashboardInsight | null {
  * Get most dangerous asset (worst winrate or highest loss)
  */
 export function getMostDangerousAsset(trades: Trade[]): DashboardInsight | null {
-  const topAssets = getTopAssets(trades);
   const closedTrades = trades.filter(t => t.status === 'closed' && t.pnl !== null);
   
   if (closedTrades.length === 0) return null;

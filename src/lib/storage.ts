@@ -238,6 +238,35 @@ export const initializeStorage = (): void => {
       baseCurrency: 'USD',
       riskPerTrade: 1,
       theme: 'light',
+      customTheme: null,
+      currentCapital: 10000,
+      initialCapital: 10000,
+      manualCapitalAdjustment: false,
+      advanced: {
+        tradingRules: {
+          maxTradesPerDay: null,
+          maxTradesPerWeek: null,
+          allowedTradingHours: {
+            enabled: false,
+            startHour: 9,
+            endHour: 17,
+          },
+          maxLotSize: null,
+          dailyProfitTarget: null,
+          dailyLossLimit: null,
+          psychologicalRules: [],
+        },
+        ultraDisciplinedMode: {
+          enabled: false,
+          blockOnRuleBreak: false,
+          blockedUntil: null,
+        },
+        studyMode: {
+          enabled: false,
+          hideMoney: false,
+          showOnlyRMultiples: false,
+        },
+      },
     });
   }
 };

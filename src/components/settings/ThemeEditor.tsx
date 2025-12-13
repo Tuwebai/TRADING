@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { Palette, Eye, RotateCcw } from 'lucide-react';
 import type { ThemeName, ThemeConfig } from '@/types/Trading';
-import { predefinedThemes, applyTheme, getTheme } from '@/lib/themes';
+import { predefinedThemes, applyTheme } from '@/lib/themes';
 
 interface ThemeEditorProps {
   currentTheme: ThemeName;
@@ -23,7 +23,6 @@ export const ThemeEditor: React.FC<ThemeEditorProps> = ({
   const [editingCustom, setEditingCustom] = useState<ThemeConfig>(
     customTheme || predefinedThemes.custom
   );
-  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (selectedTheme !== 'custom') {

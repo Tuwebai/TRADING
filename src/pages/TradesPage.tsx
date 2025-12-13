@@ -5,10 +5,10 @@ import { Label } from '@/components/ui/Label';
 import { Modal } from '@/components/ui/Modal';
 import { TradeForm } from '@/components/trades/TradeForm';
 import { TradeTable } from '@/components/trades/TradeTable';
-import { TradeFilters } from '@/components/trades/TradeFilters';
+import { TradeFiltersComponent } from '@/components/trades/TradeFilters';
 import { TradeCategoryChart } from '@/components/trades/TradeCategoryChart';
 import { BlockedOverlay } from '@/components/trading/BlockedOverlay';
-import { Plus, AlertTriangle } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useTradeStore } from '@/store/tradeStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { checkTradingRules, isBlocked, blockUser } from '@/lib/tradingRules';
@@ -36,7 +36,6 @@ export const TradesPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [closingTrade, setClosingTrade] = useState<Trade | null>(null);
-  const [ruleViolations, setRuleViolations] = useState<string[]>([]);
 
   useEffect(() => {
     loadTrades();
@@ -69,25 +68,37 @@ export const TradesPage = () => {
       const violations = checkTradingRules(trades, settings, {
         positionSize: formData.positionSize,
         entryDate: formData.entryDate,
+        asset: formData.asset,
       });
       
-      if (violations.length > 0) {
-        const violationMessages = violations.map(v => v.message);
-        setRuleViolations(violationMessages);
+      // Separate critical violations (errors) from warnings
+      const criticalViolations = violations.filter(v => v.severity === 'error');
+      const warnings = violations.filter(v => v.severity === 'warning');
+      
+      // Always block if there are critical violations
+      if (criticalViolations.length > 0) {
+        const violationMessages = criticalViolations.map(v => v.message);
         
         // If ultra-disciplined mode is enabled, block user
         if (settings.advanced?.ultraDisciplinedMode.enabled && 
             settings.advanced?.ultraDisciplinedMode.blockOnRuleBreak) {
           const blockSettings = blockUser(settings, 24); // Block for 24 hours
           updateSettings(blockSettings);
-          alert(`⚠️ Has roto una regla de trading!\n\n${violationMessages.join('\n')}\n\nEl trading ha sido bloqueado por 24 horas.`);
+          alert(`❌ Has roto una regla de trading!\n\n${violationMessages.join('\n')}\n\nEl trading ha sido bloqueado por 24 horas.`);
           setIsModalOpen(false);
           return;
         } else {
-          // Show warning but allow trade
-          if (!window.confirm(`⚠️ Advertencia: Has roto una regla de trading.\n\n${violationMessages.join('\n')}\n\n¿Deseas continuar de todas formas?`)) {
-            return;
-          }
+          // Block the trade creation even without ultra-disciplined mode
+          alert(`❌ No se puede crear la operación:\n\n${violationMessages.join('\n')}`);
+          return;
+        }
+      }
+      
+      // Show warnings but allow trade
+      if (warnings.length > 0) {
+        const warningMessages = warnings.map(v => v.message);
+        if (!window.confirm(`⚠️ Advertencia: Has roto una regla de trading.\n\n${warningMessages.join('\n')}\n\n¿Deseas continuar de todas formas?`)) {
+          return;
         }
       }
     }
@@ -100,7 +111,6 @@ export const TradesPage = () => {
     setIsModalOpen(false);
     setEditingTrade(null);
     setClosingTrade(null);
-    setRuleViolations([]);
   };
 
   const handleCloseTradeSubmit = (exitPrice: number, exitDate: string) => {
@@ -141,7 +151,7 @@ export const TradesPage = () => {
         </Button>
       </div>
 
-      <TradeFilters
+      <TradeFiltersComponent
         filters={filters}
         onFiltersChange={setFilters}
         onClearFilters={clearFilters}

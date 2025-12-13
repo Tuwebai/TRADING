@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Shield, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { RiskMetrics } from '@/lib/risk';
 import { getRiskLevel, getRiskWarnings } from '@/lib/risk';

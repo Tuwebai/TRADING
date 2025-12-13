@@ -4,8 +4,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { Collapsible } from '@/components/ui/Collapsible';
+import { CollapsibleWithTitle } from '@/components/ui/CollapsibleWithTitle';
 import { TagSelector } from './TagSelector';
 import { ImageUpload } from './ImageUpload';
 import { VideoLinks } from './VideoLinks';
@@ -14,6 +13,7 @@ import { AlertTriangle } from 'lucide-react';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTradeStore } from '@/store/tradeStore';
 import { checkTradingRules } from '@/lib/tradingRules';
+import type { RuleViolation } from '@/lib/tradingRules';
 import type { TradeFormData, PositionType, Trade, TradeJournal } from '@/types/Trading';
 
 interface TradeFormProps {
@@ -23,6 +23,9 @@ interface TradeFormProps {
 }
 
 export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel }) => {
+  const { settings } = useSettingsStore();
+  const { trades } = useTradeStore();
+  
   const defaultJournal: TradeJournal = {
     preTrade: {
       technicalAnalysis: '',
@@ -44,6 +47,8 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
     },
   };
 
+  const [ruleViolations, setRuleViolations] = useState<RuleViolation[]>([]);
+  
   const [formData, setFormData] = useState<TradeFormData>({
     asset: '',
     positionType: 'long',
@@ -100,6 +105,13 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
     if (formData.positionSize <= 0) {
       newErrors.positionSize = 'El tamaño de la posición debe ser mayor que 0';
     }
+    
+    // Validate against trading rules
+    if (!trade && settings.advanced?.tradingRules.maxLotSize !== null && settings.advanced) {
+      if (formData.positionSize > settings.advanced.tradingRules.maxLotSize!) {
+        newErrors.positionSize = `El tamaño de lote máximo permitido es ${settings.advanced.tradingRules.maxLotSize}. Tu tamaño actual: ${formData.positionSize}`;
+      }
+    }
 
     if (formData.exitPrice !== null && formData.exitPrice <= 0) {
       newErrors.exitPrice = 'El precio de salida debe ser mayor que 0';
@@ -131,15 +143,37 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
       const violations = checkTradingRules(trades, settings, {
         positionSize: formData.positionSize,
         entryDate: formData.entryDate,
+        asset: formData.asset,
       });
-      setRuleWarnings(violations.map(v => v.message));
+      setRuleViolations(violations);
     } else {
-      setRuleWarnings([]);
+      setRuleViolations([]);
     }
-  }, [formData.positionSize, formData.entryDate, trade, trades, settings]);
+  }, [formData.positionSize, formData.entryDate, formData.asset, trade, trades, settings]);
+  
+  // Check if there are critical violations that should block submission
+  const hasCriticalViolations = ruleViolations.some((v: RuleViolation) => v.severity === 'error');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check rules again before submitting
+    if (!trade) {
+      const violations = checkTradingRules(trades, settings, {
+        positionSize: formData.positionSize,
+        entryDate: formData.entryDate,
+        asset: formData.asset,
+      });
+      
+      const criticalViolations = violations.filter(v => v.severity === 'error');
+      
+      if (criticalViolations.length > 0) {
+        // Prevent submission if there are critical violations
+        alert(`⚠️ No se puede crear la operación:\n\n${criticalViolations.map(v => `• ${v.message}`).join('\n')}`);
+        return;
+      }
+    }
+    
     if (validate()) {
       onSubmit({
         ...formData,
@@ -155,18 +189,30 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Rule Warnings */}
-      {ruleWarnings.length > 0 && !trade && (
-        <div className="p-3 bg-yellow-500/10 border border-yellow-500/50 rounded-md">
+      {/* Rule Warnings and Errors */}
+      {ruleViolations.length > 0 && !trade && (
+        <div className={`p-3 border rounded-md ${
+          hasCriticalViolations 
+            ? 'bg-red-500/10 border-red-500/50' 
+            : 'bg-yellow-500/10 border-yellow-500/50'
+        }`}>
           <div className="flex items-start gap-2">
-            <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+            <AlertTriangle className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
+              hasCriticalViolations ? 'text-red-500' : 'text-yellow-500'
+            }`} />
             <div className="flex-1">
-              <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400 mb-1">
-                Advertencias de Reglas:
+              <p className={`text-sm font-medium mb-1 ${
+                hasCriticalViolations 
+                  ? 'text-red-600 dark:text-red-400' 
+                  : 'text-yellow-600 dark:text-yellow-400'
+              }`}>
+                {hasCriticalViolations ? '❌ Violación de Reglas (No se puede crear la operación)' : '⚠️ Advertencias de Reglas:'}
               </p>
               <ul className="text-xs text-muted-foreground space-y-1">
-                {ruleWarnings.map((warning, index) => (
-                  <li key={index}>• {warning}</li>
+                {ruleViolations.map((violation, index) => (
+                  <li key={violation.id || index} className={violation.severity === 'error' ? 'text-red-600 dark:text-red-400 font-medium' : ''}>
+                    {violation.severity === 'error' ? '❌' : '⚠️'} {violation.message}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -342,7 +388,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
           </div>
         </div>
 
-        <Collapsible
+        <CollapsibleWithTitle
           title="Pre-Operación"
           description="Análisis y razones antes de abrir la operación"
           defaultOpen={false}
@@ -352,9 +398,9 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
             onChange={(journal) => setFormData({ ...formData, journal })}
             section="preTrade"
           />
-        </Collapsible>
+        </CollapsibleWithTitle>
 
-        <Collapsible
+        <CollapsibleWithTitle
           title="Durante la Operación"
           description="Cambios y ajustes mientras la operación está abierta"
           defaultOpen={false}
@@ -365,9 +411,9 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
             section="duringTrade"
             disabled={!trade && !formData.exitPrice}
           />
-        </Collapsible>
+        </CollapsibleWithTitle>
 
-        <Collapsible
+        <CollapsibleWithTitle
           title="Post-Operación"
           description="Reflexión y aprendizaje después de cerrar"
           defaultOpen={false}
@@ -378,10 +424,10 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
             section="postTrade"
             disabled={!formData.exitPrice}
           />
-        </Collapsible>
+        </CollapsibleWithTitle>
       </div>
 
-      <Collapsible
+      <CollapsibleWithTitle
         title="Multimedia y Referencias"
         description="Screenshots, gráficos y videos de la operación"
         defaultOpen={false}
@@ -397,9 +443,9 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
             onChange={(videos) => setFormData({ ...formData, videos })}
           />
         </div>
-      </Collapsible>
+      </CollapsibleWithTitle>
 
-      <Collapsible
+      <CollapsibleWithTitle
         title="Organización"
         description="Etiqueta tu operación para facilitar la búsqueda y análisis"
         defaultOpen={false}
@@ -408,13 +454,17 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
           tags={formData.tags}
           onChange={(tags) => setFormData({ ...formData, tags })}
         />
-      </Collapsible>
+      </CollapsibleWithTitle>
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
-        <Button type="submit">
+        <Button 
+          type="submit" 
+          disabled={hasCriticalViolations && !trade}
+          title={hasCriticalViolations && !trade ? 'No se puede crear la operación debido a violaciones de reglas' : ''}
+        >
           {trade ? 'Actualizar Operación' : 'Agregar Operación'}
         </Button>
       </div>

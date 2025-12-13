@@ -27,17 +27,16 @@ export const PerformanceHeatmap: React.FC<PerformanceHeatmapProps> = ({ trades, 
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   
-  // Find min/max for color scaling
-  const allPnL = heatmapData.map(d => d.totalPnl);
-  const maxPnl = Math.max(...allPnL, 0);
-  const minPnl = Math.min(...allPnL, 0);
-  const maxAbs = Math.max(Math.abs(maxPnl), Math.abs(minPnl));
+  // Find min/max for color scaling (currently not used but may be needed for intensity)
+  // const allPnL = heatmapData.map(d => d.totalPnl);
+  // const maxPnl = Math.max(...allPnL, 0);
+  // const minPnl = Math.min(...allPnL, 0);
+  // const maxAbs = Math.max(Math.abs(maxPnl), Math.abs(minPnl));
 
   const getCellColor = (pnl: number, trades: number) => {
     if (trades === 0) return 'bg-muted/20';
     
-    const intensity = maxAbs > 0 ? Math.abs(pnl) / maxAbs : 0;
-    const opacity = Math.max(0.3, Math.min(1, 0.3 + intensity * 0.7));
+    // intensity calculated but not used - opacity handled inline in className
     
     if (pnl > 0) {
       return `bg-green-500/20 border-green-500/50`;

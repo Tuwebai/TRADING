@@ -1,9 +1,8 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { getCareerTimelineData, type CareerTimelineMonth } from '@/lib/careerStats';
+import { getCareerTimelineData } from '@/lib/careerStats';
 import { formatCurrency, formatPercentage } from '@/lib/utils';
 import type { Trade } from '@/types/Trading';
-import { Tooltip } from 'recharts';
 
 interface CareerTimelineProps {
   trades: Trade[];
@@ -36,7 +35,7 @@ export const CareerTimeline: React.FC<CareerTimelineProps> = ({ trades, baseCurr
       <CardContent>
         <div className="overflow-x-auto">
           <div className="flex gap-2 min-w-full" style={{ minWidth: `${timeline.length * 80}px` }}>
-            {timeline.map((month, index) => {
+            {timeline.map((month) => {
               const intensity = Math.abs(month.totalPnl) / maxPnl;
               const opacity = 0.3 + (intensity * 0.7);
               const isPositive = month.totalPnl >= 0;

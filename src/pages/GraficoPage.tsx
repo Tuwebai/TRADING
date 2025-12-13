@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { useSettingsStore } from '@/store/settingsStore';
 
 export const GraficoPage = () => {
-  const { settings, loadSettings } = useSettingsStore();
+  const { loadSettings } = useSettingsStore();
   const [symbol, setSymbol] = useState('EURUSD');
   const [interval, setInterval] = useState('D');
 

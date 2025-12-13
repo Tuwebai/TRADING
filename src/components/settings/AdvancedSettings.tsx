@@ -2,13 +2,11 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
-import { Textarea } from '@/components/ui/Textarea';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Button } from '@/components/ui/Button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/Collapsible';
 import { ChevronDown, ChevronUp, Shield, BookOpen, Lock } from 'lucide-react';
 import type { AdvancedSettings, TradingRules } from '@/types/Trading';
-import { cn } from '@/lib/utils';
 
 interface AdvancedSettingsProps {
   advanced: AdvancedSettings;
@@ -191,10 +189,10 @@ export const AdvancedSettingsComponent: React.FC<AdvancedSettingsProps> = ({
                   <Checkbox
                     id="allowedHoursEnabled"
                     checked={advanced.tradingRules.allowedTradingHours.enabled}
-                    onCheckedChange={(checked) => updateTradingRules({
+                    onChange={(e) => updateTradingRules({
                       allowedTradingHours: {
                         ...advanced.tradingRules.allowedTradingHours,
-                        enabled: checked as boolean,
+                        enabled: e.target.checked,
                       },
                     })}
                   />
@@ -289,8 +287,8 @@ export const AdvancedSettingsComponent: React.FC<AdvancedSettingsProps> = ({
                   <Checkbox
                     id="ultraDisciplinedEnabled"
                     checked={advanced.ultraDisciplinedMode.enabled}
-                    onCheckedChange={(checked) => updateUltraDisciplined({
-                      enabled: checked as boolean,
+                    onChange={(e) => updateUltraDisciplined({
+                      enabled: e.target.checked,
                     })}
                   />
                   <Label htmlFor="ultraDisciplinedEnabled" className="font-semibold">
@@ -304,8 +302,8 @@ export const AdvancedSettingsComponent: React.FC<AdvancedSettingsProps> = ({
                       <Checkbox
                         id="blockOnRuleBreak"
                         checked={advanced.ultraDisciplinedMode.blockOnRuleBreak}
-                        onCheckedChange={(checked) => updateUltraDisciplined({
-                          blockOnRuleBreak: checked as boolean,
+                        onChange={(e) => updateUltraDisciplined({
+                          blockOnRuleBreak: e.target.checked,
                         })}
                       />
                       <Label htmlFor="blockOnRuleBreak">
@@ -346,8 +344,8 @@ export const AdvancedSettingsComponent: React.FC<AdvancedSettingsProps> = ({
                   <Checkbox
                     id="studyModeEnabled"
                     checked={advanced.studyMode.enabled}
-                    onCheckedChange={(checked) => updateStudyMode({
-                      enabled: checked as boolean,
+                    onChange={(e) => updateStudyMode({
+                      enabled: e.target.checked,
                     })}
                   />
                   <Label htmlFor="studyModeEnabled" className="font-semibold">
@@ -361,8 +359,8 @@ export const AdvancedSettingsComponent: React.FC<AdvancedSettingsProps> = ({
                       <Checkbox
                         id="hideMoney"
                         checked={advanced.studyMode.hideMoney}
-                        onCheckedChange={(checked) => updateStudyMode({
-                          hideMoney: checked as boolean,
+                        onChange={(e) => updateStudyMode({
+                          hideMoney: e.target.checked,
                         })}
                       />
                       <Label htmlFor="hideMoney">
@@ -374,8 +372,8 @@ export const AdvancedSettingsComponent: React.FC<AdvancedSettingsProps> = ({
                       <Checkbox
                         id="showOnlyRMultiples"
                         checked={advanced.studyMode.showOnlyRMultiples}
-                        onCheckedChange={(checked) => updateStudyMode({
-                          showOnlyRMultiples: checked as boolean,
+                        onChange={(e) => updateStudyMode({
+                          showOnlyRMultiples: e.target.checked,
                         })}
                       />
                       <Label htmlFor="showOnlyRMultiples">

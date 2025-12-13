@@ -4,7 +4,6 @@
  */
 
 import type { Trade, Settings } from '@/types/Trading';
-import { getTradesByDay } from './calendarStats';
 
 export interface RuleViolation {
   id: string;
@@ -91,7 +90,7 @@ export function checkTradingRules(
         id: 'max-lot-size',
         rule: 'maxLotSize',
         severity: 'error',
-        message: `El tamaño de lote máximo permitido es ${rules.maxLotSize}.`,
+        message: `El tamaño de lote máximo permitido es ${rules.maxLotSize}. Tu tamaño actual: ${newTrade.positionSize}`,
       });
     }
   }
