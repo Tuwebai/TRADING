@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { SkeletonChart, SkeletonStatCard } from '@/components/ui/Skeleton';
 import { PerformanceHeatmap } from '@/components/analytics/PerformanceHeatmap';
 import { TemporalAnalysis } from '@/components/analytics/TemporalAnalysis';
+import { ChartExportButton } from '@/components/analytics/ChartExportButton';
 
 export const AnalyticsPage = () => {
   const { trades, loadTrades, isLoading } = useTradeStore();
@@ -179,18 +180,22 @@ export const AnalyticsPage = () => {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Curva de Equity con Drawdowns</CardTitle>
-              {maxDrawdown.maxDrawdown > 0 && (
-                <div className="text-sm text-muted-foreground">
-                  <span className="font-medium text-destructive">
-                    Drawdown Máximo: {formatCurrency(maxDrawdown.maxDrawdown, settings.baseCurrency)} ({maxDrawdown.maxDrawdownPercent.toFixed(2)}%)
-                  </span>
-                </div>
-              )}
+              <div className="flex items-center gap-4">
+                {maxDrawdown.maxDrawdown > 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium text-destructive">
+                      Drawdown Máximo: {formatCurrency(maxDrawdown.maxDrawdown, settings.baseCurrency)} ({maxDrawdown.maxDrawdownPercent.toFixed(2)}%)
+                    </span>
+                  </div>
+                )}
+                <ChartExportButton chartId="equity-chart" filename="curva_equity" />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             {equityCurve.length > 0 ? (
               <motion.div
+                id="equity-chart"
                 variants={chartVariants}
                 initial="hidden"
                 animate={chartLoaded ? 'visible' : 'hidden'}
@@ -314,10 +319,14 @@ export const AnalyticsPage = () => {
         <motion.div variants={itemVariants}>
           <Card>
             <CardHeader>
-              <CardTitle>Distribución de PnL</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Distribución de PnL</CardTitle>
+                <ChartExportButton chartId="pnl-distribution-chart" filename="distribucion_pnl" />
+              </div>
             </CardHeader>
             <CardContent>
               <motion.div
+                id="pnl-distribution-chart"
                 variants={chartVariants}
                 initial="hidden"
                 animate={chartLoaded ? 'visible' : 'hidden'}

@@ -7,11 +7,21 @@ import { TradeForm } from '@/components/trades/TradeForm';
 import { TradeTable } from '@/components/trades/TradeTable';
 import { TradeFiltersComponent } from '@/components/trades/TradeFilters';
 import { TradeCategoryChart } from '@/components/trades/TradeCategoryChart';
+import { ExportImportModal } from '@/components/trades/ExportImportModal';
+import { TemplateSelector } from '@/components/trades/TemplateSelector';
+import { TradeHistoryModal } from '@/components/trades/TradeHistoryModal';
+import { GroupedTradeView } from '@/components/trades/GroupedTradeView';
+import { TradeDetailsPanel } from '@/components/trades/TradeDetailsPanel';
+import { TradeContextualInsights } from '@/components/trades/TradeContextualInsights';
 import { BlockedOverlay } from '@/components/trading/BlockedOverlay';
-import { Plus } from 'lucide-react';
+import { Plus, Download } from 'lucide-react';
 import { useTradeStore } from '@/store/tradeStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useTemplateStore } from '@/store/templateStore';
 import { checkTradingRules, isBlocked, blockUser } from '@/lib/tradingRules';
+import { useEvaluatedTrades } from '@/hooks/useTradeRuleEvaluation';
+import { initializeBackupSystem } from '@/lib/backup';
+import { useCommonShortcuts } from '@/hooks/useKeyboardShortcuts';
 import type { Trade, TradeFormData } from '@/types/Trading';
 import { SkeletonTable } from '@/components/ui/Skeleton';
 import { motion } from 'framer-motion';
@@ -25,21 +35,57 @@ export const TradesPage = () => {
     updateTrade,
     deleteTrade,
     closeTrade,
+    duplicateTrade,
     setFilters,
     clearFilters,
     getFilteredTrades,
     isLoading,
+    selectedTradeId,
+    setSelectedTrade,
+    getSelectedTrade,
   } = useTradeStore();
   
   const { settings, updateSettings } = useSettingsStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isExportImportModalOpen, setIsExportImportModalOpen] = useState(false);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [closingTrade, setClosingTrade] = useState<Trade | null>(null);
+  const [historyTrade, setHistoryTrade] = useState<Trade | null>(null);
+  const [currentFormData, setCurrentFormData] = useState<TradeFormData | undefined>(undefined);
+
+  const { loadTemplates } = useTemplateStore();
 
   useEffect(() => {
     loadTrades();
-  }, [loadTrades]);
+    loadTemplates();
+  }, [loadTrades, loadTemplates]);
+
+  // Evaluate trades on-demand using hook
+  const evaluatedTrades = useEvaluatedTrades(trades, settings);
+
+  // Atajos de teclado
+  useCommonShortcuts({
+    onNewTrade: () => {
+      if (!blocked) {
+        handleAddTrade();
+      }
+    },
+    onClose: () => {
+      if (isModalOpen) {
+        setIsModalOpen(false);
+        setEditingTrade(null);
+        setClosingTrade(null);
+      }
+    },
+  });
+
+  // Initialize automatic backup system
+  useEffect(() => {
+    if (trades.length > 0) {
+      initializeBackupSystem(trades);
+    }
+  }, [trades.length]);
 
   const handleAddTrade = () => {
     setEditingTrade(null);
@@ -62,7 +108,14 @@ export const TradesPage = () => {
     setIsModalOpen(true);
   };
 
+  const handleTemplateSelect = (formData: TradeFormData) => {
+    setCurrentFormData(formData);
+    setEditingTrade(null);
+    setIsModalOpen(true);
+  };
+
   const handleSubmitTrade = (formData: TradeFormData) => {
+    setCurrentFormData(undefined);
     // Check trading rules before adding trade
     if (!editingTrade) {
       const violations = checkTradingRules(trades, settings, {
@@ -121,7 +174,72 @@ export const TradesPage = () => {
     }
   };
 
-  const filteredTrades = getFilteredTrades();
+  const handleImportComplete = (importedTrades: Trade[]) => {
+    // Add imported trades to the store
+    importedTrades.forEach(trade => {
+      try {
+        addTrade({
+          asset: trade.asset,
+          positionType: trade.positionType,
+          entryPrice: trade.entryPrice,
+          exitPrice: trade.exitPrice,
+          positionSize: trade.positionSize,
+          leverage: trade.leverage,
+          stopLoss: trade.stopLoss,
+          takeProfit: trade.takeProfit,
+          entryDate: trade.entryDate,
+          exitDate: trade.exitDate,
+          notes: trade.notes,
+          screenshots: trade.screenshots,
+          videos: trade.videos,
+          tags: trade.tags,
+          journal: trade.journal,
+        });
+      } catch (error) {
+        console.error('Error importing trade:', error);
+      }
+    });
+    loadTrades(); // Reload to refresh the list
+  };
+
+  // Use evaluated trades for filtering and display
+  const baseTrades = evaluatedTrades.length > 0 ? evaluatedTrades : trades;
+  
+  // Apply filters to evaluated trades
+  const filteredTrades = baseTrades.filter(trade => {
+    
+    // Apply all filters (reuse logic from getFilteredTrades)
+    if (filters.dateFrom && trade.entryDate < filters.dateFrom) return false;
+    if (filters.dateTo && trade.entryDate > filters.dateTo) return false;
+    if (filters.asset && trade.asset.toLowerCase() !== filters.asset.toLowerCase()) return false;
+    
+    if (filters.winLoss && filters.winLoss !== 'all') {
+      if (trade.status !== 'closed' || trade.pnl === null) return false;
+      if (filters.winLoss === 'win' && trade.pnl <= 0) return false;
+      if (filters.winLoss === 'loss' && trade.pnl >= 0) return false;
+    }
+    
+    if (filters.status && filters.status !== 'all' && trade.status !== filters.status) return false;
+    if (filters.session && filters.session !== 'all' && trade.session !== filters.session) return false;
+    if (filters.setupId && trade.setupId !== filters.setupId) return false;
+    
+    if (filters.minRiskReward !== null && filters.minRiskReward !== undefined) {
+      if (!trade.riskReward || trade.riskReward < filters.minRiskReward) return false;
+    }
+    
+    if (filters.ruleStatus) {
+      const hasViolations = trade.violatedRules && trade.violatedRules.length > 0;
+      if (filters.ruleStatus === 'compliant' && hasViolations) return false;
+      if (filters.ruleStatus === 'violations' && !hasViolations) return false;
+    }
+    
+    if (filters.classification && filters.classification !== 'all') {
+      if (trade.tradeClassification !== filters.classification) return false;
+    }
+    
+    return true;
+  });
+  
   const uniqueAssets = Array.from(new Set(trades.map(t => t.asset))).sort();
 
   const blocked = isBlocked(settings);
@@ -141,14 +259,23 @@ export const TradesPage = () => {
             Gestiona tus posiciones de trading y rastrea el rendimiento
           </p>
         </div>
-        <Button 
-          onClick={handleAddTrade}
-          disabled={blocked}
-          title={blocked ? 'Trading bloqueado por violación de reglas' : ''}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar Operación
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setIsExportImportModalOpen(true)}
+            variant="outline"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Exportar/Importar
+          </Button>
+          <Button 
+            onClick={handleAddTrade}
+            disabled={blocked}
+            title={blocked ? 'Trading bloqueado por violación de reglas' : ''}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Operación
+          </Button>
+        </div>
       </div>
 
       <TradeFiltersComponent
@@ -158,17 +285,44 @@ export const TradesPage = () => {
         uniqueAssets={uniqueAssets}
       />
 
+      {/* Contextual Insights - Above table */}
+      {filteredTrades.length > 0 && (
+        <TradeContextualInsights trades={filteredTrades} />
+      )}
+
       {/* Gráfico de distribución de operaciones */}
       <TradeCategoryChart trades={trades} />
 
       {isLoading ? (
         <SkeletonTable />
-      ) : (
-        <TradeTable
+      ) : filters.groupBy ? (
+        <GroupedTradeView
           trades={filteredTrades}
+          groupBy={filters.groupBy}
+          selectedTradeId={selectedTradeId}
           onEdit={handleEditTrade}
           onDelete={handleDeleteTrade}
           onClose={handleCloseTrade}
+          onDuplicate={(id) => {
+            duplicateTrade(id);
+            loadTrades();
+          }}
+          onShowHistory={(trade) => setHistoryTrade(trade)}
+          onSelectTrade={(trade) => setSelectedTrade(trade.id)}
+        />
+      ) : (
+        <TradeTable
+          trades={filteredTrades}
+          selectedTradeId={selectedTradeId}
+          onEdit={handleEditTrade}
+          onDelete={handleDeleteTrade}
+          onClose={handleCloseTrade}
+          onDuplicate={(id) => {
+            duplicateTrade(id);
+            loadTrades();
+          }}
+          onShowHistory={(trade) => setHistoryTrade(trade)}
+          onSelectTrade={(trade) => setSelectedTrade(trade.id)}
         />
       )}
 
@@ -192,16 +346,53 @@ export const TradesPage = () => {
             }}
           />
         ) : (
-          <TradeForm
-            trade={editingTrade}
-            onSubmit={handleSubmitTrade}
-            onCancel={() => {
-              setIsModalOpen(false);
-              setEditingTrade(null);
-            }}
-          />
+          <>
+            <div className="mb-4">
+              <TemplateSelector
+                onSelectTemplate={handleTemplateSelect}
+                currentFormData={currentFormData}
+              />
+            </div>
+            <TradeForm
+              trade={editingTrade}
+              initialFormData={currentFormData}
+              onSubmit={handleSubmitTrade}
+              onCancel={() => {
+                setIsModalOpen(false);
+                setEditingTrade(null);
+                setCurrentFormData(undefined);
+              }}
+            />
+          </>
         )}
       </Modal>
+
+      <TradeHistoryModal
+        isOpen={!!historyTrade}
+        onClose={() => setHistoryTrade(null)}
+        trade={historyTrade}
+      />
+
+      {/* Trade Details Panel */}
+      {getSelectedTrade() && (
+        <TradeDetailsPanel
+          trade={getSelectedTrade()!}
+          onEdit={handleEditTrade}
+          onDelete={handleDeleteTrade}
+          onDuplicate={(id) => {
+            duplicateTrade(id);
+            loadTrades();
+          }}
+          onClose={() => setSelectedTrade(null)}
+        />
+      )}
+
+      <ExportImportModal
+        isOpen={isExportImportModalOpen}
+        onClose={() => setIsExportImportModalOpen(false)}
+        trades={trades}
+        onImportComplete={handleImportComplete}
+      />
       </motion.div>
     </BlockedOverlay>
   );

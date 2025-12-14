@@ -7,6 +7,7 @@ export type PositionType = 'long' | 'short';
 export type TradeStatus = 'open' | 'closed';
 export type RoutineType = 'morning' | 'pre-market' | 'pre-trade' | 'post-trade' | 'end-of-day';
 export type EmotionType = 'confiado' | 'ansioso' | 'temeroso' | 'emocionado' | 'neutral' | 'frustrado' | 'euforico' | 'deprimido';
+export type TradingSession = 'asian' | 'london' | 'new-york' | 'overlap' | 'other';
 
 /**
  * Journal entries for a trade
@@ -29,6 +30,30 @@ export interface TradeJournal {
     whatWentWrong: string;
     lessonsLearned: string;
     emotion: EmotionType | null;
+  };
+}
+
+/**
+ * Trading Setup definition
+ */
+export interface TradingSetup {
+  id: string;
+  name: string;
+  description: string;
+  category: string; // e.g., "breakout", "reversal", "trend-following"
+  imageUrl?: string; // Screenshot or diagram
+  rules: string[]; // Setup rules/conditions
+  entryCriteria: string;
+  exitCriteria: string;
+  riskManagement: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  stats?: {
+    totalTrades: number;
+    winRate: number;
+    avgPnl: number;
+    profitFactor: number;
   };
 }
 
@@ -57,6 +82,72 @@ export interface Trade {
   riskReward: number | null; // Auto-calculated
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
+  changeHistory?: TradeChange[]; // Historial de cambios
+  // Trading-specific fields
+  commission?: number; // Commission paid
+  spread?: number; // Spread cost
+  swap?: number; // Swap/rollover cost
+  swapRate?: number; // Swap rate in pips (for calculation)
+  swapType?: 'long' | 'short' | 'both'; // Which positions pay swap
+  session?: TradingSession; // Trading session
+  setupId?: string; // Reference to setup used
+  pips?: number; // Pips gained/lost (for forex)
+  riskPips?: number; // Risk in pips
+  rewardPips?: number; // Reward in pips
+  // Rule evaluation fields
+  evaluatedRules?: EvaluatedRule[]; // All rules evaluated for this trade
+  violatedRules?: ViolatedRule[]; // Rules that were violated
+  tradeClassification?: 'modelo' | 'neutral' | 'error'; // Trade classification
+}
+
+/**
+ * Trade change history entry
+ */
+export interface TradeChange {
+  id: string;
+  timestamp: string; // ISO date string
+  field: string; // Campo modificado
+  oldValue: any;
+  newValue: any;
+  changedBy?: string; // Usuario que hizo el cambio (futuro)
+}
+
+/**
+ * Evaluated rule for a trade
+ */
+export interface EvaluatedRule {
+  id: string;
+  ruleName: string;
+  ruleKey: string; // e.g., 'maxTradesPerDay', 'riskPerTrade'
+  respected: boolean;
+  expectedValue?: string | number;
+  actualValue?: string | number;
+  severity?: 'critical' | 'minor';
+}
+
+/**
+ * Violated rule for a trade
+ */
+export interface ViolatedRule {
+  id: string;
+  ruleName: string;
+  ruleKey: string;
+  expectedValue: string | number;
+  actualValue: string | number;
+  severity: 'critical' | 'minor';
+  message: string;
+}
+
+/**
+ * Trade template for quick creation
+ */
+export interface TradeTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  formData: TradeFormData;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
@@ -169,6 +260,14 @@ export interface TradeFilters {
   asset: string | null;
   winLoss: 'win' | 'loss' | 'all' | null;
   status: TradeStatus | 'all' | null;
+  groupBy?: 'day' | 'week' | 'month' | null; // Vista agrupada
+  session?: TradingSession | 'all' | null; // Filtro por sesión
+  setupId?: string | null; // Filtro por setup
+  minRiskReward?: number | null; // Minimum R/R ratio
+  riskPercentMin?: number | null; // Minimum risk %
+  riskPercentMax?: number | null; // Maximum risk %
+  ruleStatus?: 'all' | 'compliant' | 'violations' | null; // Rule compliance filter
+  classification?: 'modelo' | 'neutral' | 'error' | 'all' | null; // Trade classification
 }
 
 /**
@@ -215,6 +314,13 @@ export interface TradeFormData {
   videos: string[];
   tags: string[];
   journal: TradeJournal;
+  commission?: number;
+  spread?: number;
+  swap?: number;
+  swapRate?: number;
+  swapType?: 'long' | 'short' | 'both';
+  session?: TradingSession;
+  setupId?: string;
 }
 
 /**
@@ -242,4 +348,3 @@ export interface TradingGoal {
   createdAt: string;
   updatedAt: string;
 }
-

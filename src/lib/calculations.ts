@@ -92,7 +92,13 @@ export function calculatePNL(trade: Trade): number {
     }
   }
 
-  return pnl;
+  // Subtract costs (commission, swap, spread)
+  const commission = trade.commission || 0;
+  const swap = trade.swap || 0;
+  const spread = trade.spread || 0;
+  const totalCosts = commission + swap + spread;
+  
+  return pnl - totalCosts;
 }
 
 /**

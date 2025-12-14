@@ -11,12 +11,14 @@
  * 3. Update return types to handle async operations if needed
  */
 
-import type { Trade, Routine, Settings } from '@/types/Trading';
+import type { Trade, Routine, Settings, TradeTemplate, TradingSetup } from '@/types/Trading';
 
 const STORAGE_KEYS = {
   TRADES: 'trading_log_trades',
   ROUTINES: 'trading_log_routines',
   SETTINGS: 'trading_log_settings',
+  TEMPLATES: 'trading_log_templates',
+  SETUPS: 'trading_log_setups',
 } as const;
 
 /**
@@ -223,6 +225,126 @@ export const settingsStorage = {
   save(settings: Settings): void {
     const storage = new StorageService();
     storage['save'](STORAGE_KEYS.SETTINGS, settings);
+  },
+};
+
+/**
+ * Trade template storage operations
+ */
+export const templateStorage = {
+  /**
+   * Get all templates
+   */
+  getAll(): TradeTemplate[] {
+    const storage = new StorageService();
+    return storage['load']<TradeTemplate[]>(STORAGE_KEYS.TEMPLATES, []);
+  },
+
+  /**
+   * Save all templates
+   */
+  saveAll(templates: TradeTemplate[]): void {
+    const storage = new StorageService();
+    storage['save'](STORAGE_KEYS.TEMPLATES, templates);
+  },
+
+  /**
+   * Get a single template by ID
+   */
+  getById(id: string): TradeTemplate | null {
+    const templates = this.getAll();
+    return templates.find(template => template.id === id) || null;
+  },
+
+  /**
+   * Add a new template
+   */
+  add(template: TradeTemplate): void {
+    const templates = this.getAll();
+    templates.push(template);
+    this.saveAll(templates);
+  },
+
+  /**
+   * Update an existing template
+   */
+  update(id: string, updates: Partial<TradeTemplate>): void {
+    const templates = this.getAll();
+    const index = templates.findIndex(template => template.id === id);
+    if (index === -1) {
+      throw new Error(`Template with id ${id} not found`);
+    }
+    templates[index] = { ...templates[index], ...updates, updatedAt: new Date().toISOString() };
+    this.saveAll(templates);
+  },
+
+  /**
+   * Delete a template
+   */
+  delete(id: string): void {
+    const templates = this.getAll();
+    const filtered = templates.filter(template => template.id !== id);
+    this.saveAll(filtered);
+  },
+};
+
+/**
+ * Trading setup storage operations
+ */
+export const setupStorage = {
+  /**
+   * Get all setups
+   */
+  getAll(): TradingSetup[] {
+    const storage = new StorageService();
+    return storage['load']<TradingSetup[]>(STORAGE_KEYS.SETUPS, []);
+  },
+
+  /**
+   * Save all setups
+   */
+  saveAll(setups: TradingSetup[]): void {
+    const storage = new StorageService();
+    storage['save'](STORAGE_KEYS.SETUPS, setups);
+  },
+
+  /**
+   * Get a single setup by ID
+   */
+  getById(id: string): TradingSetup | null {
+    const setups = this.getAll();
+    return setups.find(setup => setup.id === id) || null;
+  },
+
+  /**
+   * Add a new setup
+   */
+  add(setup: TradingSetup): void {
+    const setups = this.getAll();
+    setups.push(setup);
+    this.saveAll(setups);
+  },
+
+  /**
+   * Update an existing setup
+   */
+  update(id: string, updates: Partial<TradingSetup>): void {
+    const setups = this.getAll();
+    const index = setups.findIndex(setup => setup.id === id);
+    if (index === -1) {
+      throw new Error(`Setup with id ${id} not found`);
+    }
+    setups[index] = { ...setups[index], ...updates, updatedAt: new Date().toISOString() };
+    this.saveAll(setups);
+  },
+
+  /**
+   * Delete a setup
+   */
+  delete(id: string): void {
+    const setups = this.getAll();
+    const filtered = setups.filter(setup => setup.id !== id);
+    this.saveAll(filtered);
   },
 };
 

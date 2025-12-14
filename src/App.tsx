@@ -14,6 +14,7 @@ import { CalendarPage } from '@/pages/CalendarPage';
 import { CareerPage } from '@/pages/CareerPage';
 import { InsightsPage } from '@/pages/InsightsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { SetupsPage } from '@/pages/SetupsPage';
 import { PrivateRoute } from '@/components/auth/PrivateRoute';
 import { initializeStorage } from '@/lib/storage';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -128,6 +129,15 @@ function AppRoutes() {
             <Layout>
               <AnimatePresence mode="wait">
                 <PageTransition key={location.pathname}><SettingsPage /></PageTransition>
+              </AnimatePresence>
+            </Layout>
+          </PrivateRoute>
+        } />
+        <Route path="/setups" element={
+          <PrivateRoute>
+            <Layout>
+              <AnimatePresence mode="wait">
+                <PageTransition key={location.pathname}><SetupsPage /></PageTransition>
               </AnimatePresence>
             </Layout>
           </PrivateRoute>

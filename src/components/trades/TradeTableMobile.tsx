@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Edit, Trash2, X, TrendingUp, TrendingDown } from 'lucide-react';
+import { Edit, Trash2, X, TrendingUp, TrendingDown, Copy, History } from 'lucide-react';
 import type { Trade } from '@/types/Trading';
 import { formatPrice, formatCurrency, formatDate } from '@/lib/utils';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -8,16 +8,24 @@ import { motion } from 'framer-motion';
 
 interface TradeTableMobileProps {
   trades: Trade[];
+  selectedTradeId?: string | null;
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
   onClose: (trade: Trade) => void;
+  onDuplicate: (id: string) => void;
+  onShowHistory?: (trade: Trade) => void;
+  onSelectTrade?: (trade: Trade) => void;
 }
 
 export const TradeTableMobile: React.FC<TradeTableMobileProps> = ({ 
   trades, 
+  selectedTradeId,
   onEdit, 
   onDelete, 
-  onClose 
+  onClose,
+  onDuplicate,
+  onShowHistory,
+  onSelectTrade
 }) => {
   const { settings } = useSettingsStore();
 
@@ -44,7 +52,12 @@ export const TradeTableMobile: React.FC<TradeTableMobileProps> = ({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
           >
-            <Card className="p-4">
+            <Card 
+              className={`p-4 cursor-pointer transition-colors ${
+                selectedTradeId === trade.id ? 'border-primary bg-primary/10' : ''
+              }`}
+              onClick={() => onSelectTrade?.(trade)}
+            >
               <div className="space-y-3">
                 {/* Header */}
                 <div className="flex items-start justify-between">
@@ -52,7 +65,7 @@ export const TradeTableMobile: React.FC<TradeTableMobileProps> = ({
                     <h3 className="font-semibold text-lg">{trade.asset}</h3>
                     <p className="text-sm text-muted-foreground">{formatDate(trade.entryDate)}</p>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     {trade.status === 'open' && (
                       <Button
                         variant="ghost"
@@ -62,6 +75,26 @@ export const TradeTableMobile: React.FC<TradeTableMobileProps> = ({
                         aria-label="Cerrar Operación"
                       >
                         <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDuplicate(trade.id)}
+                      className="touch-manipulation"
+                      aria-label="Duplicar Operación"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    {onShowHistory && trade.changeHistory && trade.changeHistory.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onShowHistory(trade)}
+                        className="touch-manipulation"
+                        aria-label="Ver Historial"
+                      >
+                        <History className="h-4 w-4" />
                       </Button>
                     )}
                     <Button
@@ -134,6 +167,11 @@ export const TradeTableMobile: React.FC<TradeTableMobileProps> = ({
                   <div>
                     <p className="text-muted-foreground">Tamaño</p>
                     <p className="font-medium">{trade.positionSize}</p>
+                    {trade.pips !== null && trade.pips !== undefined && (
+                      <p className={`text-xs mt-1 ${trade.pips >= 0 ? 'text-profit' : 'text-loss'}`}>
+                        {trade.pips > 0 ? '+' : ''}{trade.pips.toFixed(1)} pips
+                      </p>
+                    )}
                   </div>
                   <div>
                     <p className="text-muted-foreground">R/R</p>

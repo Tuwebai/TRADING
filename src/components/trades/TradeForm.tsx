@@ -12,19 +12,27 @@ import { JournalSection } from './JournalSection';
 import { AlertTriangle } from 'lucide-react';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTradeStore } from '@/store/tradeStore';
+import { useSetupStore } from '@/store/setupStore';
 import { checkTradingRules } from '@/lib/tradingRules';
 import type { RuleViolation } from '@/lib/tradingRules';
-import type { TradeFormData, PositionType, Trade, TradeJournal } from '@/types/Trading';
+import type { TradeFormData, PositionType, Trade, TradeJournal, TradingSession } from '@/types/Trading';
+import { isForexPair } from '@/lib/forexCalculations';
 
 interface TradeFormProps {
   trade?: Trade | null;
+  initialFormData?: TradeFormData;
   onSubmit: (data: TradeFormData) => void;
   onCancel: () => void;
 }
 
-export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel }) => {
+export const TradeForm: React.FC<TradeFormProps> = ({ trade, initialFormData, onSubmit, onCancel }) => {
   const { settings } = useSettingsStore();
   const { trades } = useTradeStore();
+  const { setups, loadSetups } = useSetupStore();
+  
+  useEffect(() => {
+    loadSetups();
+  }, [loadSetups]);
   
   const defaultJournal: TradeJournal = {
     preTrade: {
@@ -65,6 +73,13 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
     videos: [],
     tags: [],
     journal: defaultJournal,
+    commission: undefined,
+    spread: undefined,
+    swap: undefined,
+    swapRate: undefined,
+    swapType: undefined,
+    session: undefined,
+    setupId: undefined,
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof TradeFormData, string>>>({});
@@ -87,9 +102,23 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
         videos: trade.videos || [],
         tags: trade.tags || [],
         journal: trade.journal || defaultJournal,
+        commission: trade.commission,
+        spread: trade.spread,
+        swap: trade.swap,
+        swapRate: trade.swapRate,
+        swapType: trade.swapType,
+        session: trade.session,
+        setupId: trade.setupId,
+      });
+    } else if (initialFormData) {
+      // Reset entry date to today when using template
+      setFormData({
+        ...initialFormData,
+        entryDate: new Date().toISOString().split('T')[0],
+        exitDate: null,
       });
     }
-  }, [trade]);
+  }, [trade, initialFormData]);
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof TradeFormData, string>> = {};
@@ -150,6 +179,50 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
       setRuleViolations([]);
     }
   }, [formData.positionSize, formData.entryDate, formData.asset, trade, trades, settings]);
+
+  // Calculate swap automatically for forex trades
+  useEffect(() => {
+    if (isForexPair(formData.asset) && formData.swapRate && formData.entryDate && formData.exitDate) {
+      const tempTrade: Trade = {
+        id: '',
+        asset: formData.asset,
+        positionType: formData.positionType,
+        entryPrice: formData.entryPrice,
+        exitPrice: formData.exitPrice,
+        positionSize: formData.positionSize,
+        leverage: formData.leverage,
+        stopLoss: formData.stopLoss,
+        takeProfit: formData.takeProfit,
+        entryDate: formData.entryDate,
+        exitDate: formData.exitDate,
+        notes: formData.notes,
+        screenshots: formData.screenshots,
+        videos: formData.videos,
+        tags: formData.tags,
+        journal: formData.journal,
+        status: formData.exitPrice ? 'closed' : 'open',
+        pnl: null,
+        riskReward: null,
+        createdAt: '',
+        updatedAt: '',
+      };
+      
+      const calculatedSwap = calculateSwap(
+        tempTrade,
+        formData.swapRate,
+        formData.swapType || 'both'
+      );
+      
+      if (Math.abs(calculatedSwap - (formData.swap || 0)) > 0.01) {
+        setFormData(prev => ({ ...prev, swap: calculatedSwap }));
+      }
+    } else if (!isForexPair(formData.asset) || !formData.swapRate || !formData.exitDate) {
+      if (formData.swap !== undefined && formData.swap !== null) {
+        setFormData(prev => ({ ...prev, swap: undefined }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.asset, formData.swapRate, formData.swapType, formData.entryDate, formData.exitDate, formData.positionSize, formData.positionType]);
   
   // Check if there are critical violations that should block submission
   const hasCriticalViolations = ruleViolations.some((v: RuleViolation) => v.severity === 'error');
@@ -454,6 +527,130 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, onSubmit, onCancel 
           tags={formData.tags}
           onChange={(tags) => setFormData({ ...formData, tags })}
         />
+      </CollapsibleWithTitle>
+
+      <CollapsibleWithTitle
+        title="Costos y Configuración Avanzada"
+        description="Comisiones, spreads, swap y configuración adicional"
+        defaultOpen={false}
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="commission">Comisión</Label>
+              <Input
+                id="commission"
+                type="number"
+                step="0.01"
+                value={formData.commission || ''}
+                onChange={(e) => setFormData({ ...formData, commission: e.target.value ? parseFloat(e.target.value) : undefined })}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Comisión pagada por esta operación
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="spread">Spread</Label>
+              <Input
+                id="spread"
+                type="number"
+                step="0.01"
+                value={formData.spread || ''}
+                onChange={(e) => setFormData({ ...formData, spread: e.target.value ? parseFloat(e.target.value) : undefined })}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Costo del spread
+              </p>
+            </div>
+          </div>
+
+          {isForexPair(formData.asset) && (
+            <div className="space-y-4 pt-4 border-t">
+              <h3 className="font-semibold text-sm">Swap (Forex)</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="swapRate">Swap Rate (pips)</Label>
+                  <Input
+                    id="swapRate"
+                    type="number"
+                    step="0.1"
+                    value={formData.swapRate || ''}
+                    onChange={(e) => setFormData({ ...formData, swapRate: e.target.value ? parseFloat(e.target.value) : undefined })}
+                    placeholder="0.0"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Tasa de swap en pips (puede ser negativa)
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="swapType">Tipo de Swap</Label>
+                  <Select
+                    id="swapType"
+                    value={formData.swapType || 'both'}
+                    onChange={(e) => setFormData({ ...formData, swapType: e.target.value as 'long' | 'short' | 'both' })}
+                  >
+                    <option value="both">Ambos (Long y Short)</option>
+                    <option value="long">Solo Long</option>
+                    <option value="short">Solo Short</option>
+                  </Select>
+                </div>
+
+                {formData.swap !== undefined && formData.swap !== null && (
+                  <div className="sm:col-span-2">
+                    <Label>Swap Calculado</Label>
+                    <Input
+                      type="number"
+                      value={formData.swap}
+                      readOnly
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Calculado automáticamente basado en swap rate y duración
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t">
+            <div>
+              <Label htmlFor="session">Sesión de Trading</Label>
+              <Select
+                id="session"
+                value={formData.session || ''}
+                onChange={(e) => setFormData({ ...formData, session: e.target.value ? e.target.value as TradingSession : undefined })}
+              >
+                <option value="">No especificada</option>
+                <option value="asian">Asiática</option>
+                <option value="london">Londres</option>
+                <option value="new-york">Nueva York</option>
+                <option value="overlap">Overlap (Londres/NY)</option>
+                <option value="other">Otra</option>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="setupId">Setup Utilizado</Label>
+              <Select
+                id="setupId"
+                value={formData.setupId || ''}
+                onChange={(e) => setFormData({ ...formData, setupId: e.target.value || undefined })}
+              >
+                <option value="">Ninguno</option>
+                {setups.map((setup) => (
+                  <option key={setup.id} value={setup.id}>
+                    {setup.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+        </div>
       </CollapsibleWithTitle>
 
       <div className="flex justify-end gap-2">

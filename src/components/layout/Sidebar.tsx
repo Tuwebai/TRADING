@@ -14,17 +14,26 @@ import {
   Calendar,
   User,
   Lightbulb,
-  LogOut
+  LogOut,
+  Layers,
+  AlertCircle,
+  Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSwipe } from '@/hooks/useSwipe';
 import { useAuthStore } from '@/store/authStore';
+import { useTradeStore } from '@/store/tradeStore';
+import { useSettingsStore } from '@/store/settingsStore';
+import { getPriorityInsights } from '@/lib/proactiveInsights';
+import { getRiskWarnings, getRiskLevel } from '@/lib/risk';
+import { getRiskMetrics } from '@/lib/risk';
 import { Logo } from '@/components/landing/Logo';
 
 const navigation = [
   { name: 'Panel', href: '/', icon: LayoutDashboard },
   { name: 'Operaciones', href: '/trades', icon: TrendingUp },
+  { name: 'Setups', href: '/setups', icon: Layers },
   { name: 'Gestión de Capital', href: '/capital', icon: Calculator },
   { name: 'Objetivos', href: '/goals', icon: Target },
   { name: 'Rutinas', href: '/routines', icon: CheckSquare },
@@ -45,6 +54,37 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileToggle }
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuthStore();
+  const { trades } = useTradeStore();
+  const { settings } = useSettingsStore();
+
+  // Calcular indicadores de estado
+  const getStatusIndicator = (href: string): string | null => {
+    if (href === '/insights') {
+      const insights = getPriorityInsights(trades, settings);
+      const criticalInsights = insights.filter(i => i.severity === 'critical');
+      if (criticalInsights.length > 0) return '🔴';
+      const importantInsights = insights.filter(i => i.severity === 'important');
+      if (importantInsights.length > 0) return '🟡';
+      return null;
+    }
+    
+    if (href === '/capital') {
+      const riskMetrics = getRiskMetrics(trades, settings);
+      const riskWarnings = getRiskWarnings(riskMetrics, settings);
+      const riskLevel = getRiskLevel(riskMetrics, riskWarnings);
+      if (riskLevel === 'danger') return '🔴';
+      if (riskLevel === 'warning') return '⚠️';
+      return null;
+    }
+    
+    if (href === '/routines') {
+      // Aquí se podría verificar si hay rutinas pendientes
+      // Por ahora, retornamos null ya que no tenemos acceso directo a rutinas
+      return null;
+    }
+    
+    return null;
+  };
 
   const handleLogout = () => {
     logout();
@@ -92,6 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileToggle }
         {navigation.map((item) => {
           const isActive = location.pathname === item.href;
           const Icon = item.icon;
+          const statusIndicator = getStatusIndicator(item.href);
           
           return (
             <Link
@@ -104,14 +145,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileToggle }
                 }
               }}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors touch-manipulation',
+                'flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors touch-manipulation',
                 isActive
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground active:bg-accent'
               )}
             >
-              <Icon className="h-5 w-5 flex-shrink-0" />
-              <span>{item.name}</span>
+              <div className="flex items-center gap-3">
+                <Icon className="h-5 w-5 flex-shrink-0" />
+                <span>{item.name}</span>
+              </div>
+              {statusIndicator && (
+                <span className="text-lg flex-shrink-0" title={
+                  statusIndicator === '🔴' ? 'Atención requerida' :
+                  statusIndicator === '🟡' ? 'Advertencia' :
+                  statusIndicator === '⚠️' ? 'Riesgo elevado' :
+                  statusIndicator === '⏳' ? 'Pendientes' : ''
+                }>
+                  {statusIndicator}
+                </span>
+              )}
             </Link>
           );
         })}

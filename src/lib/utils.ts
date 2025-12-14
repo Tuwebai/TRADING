@@ -101,6 +101,16 @@ export function formatDate(dateString: string): string {
 }
 
 /**
+ * Format time for display
+ */
+export function formatTime(dateString: string): string {
+  return new Date(dateString).toLocaleTimeString('es-LA', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
  * Format date and time for display
  */
 export function formatDateTime(dateString: string): string {
