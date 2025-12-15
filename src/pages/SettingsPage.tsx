@@ -24,6 +24,7 @@ export const SettingsPage = () => {
 
   useEffect(() => {
     setFormData(settings);
+    setHasChanges(false);
   }, [settings]);
 
   const handleChange = (field: keyof typeof settings, value: any) => {
@@ -37,7 +38,6 @@ export const SettingsPage = () => {
   };
 
   const handleThemeChange = (theme: ThemeName, customTheme: ThemeConfig | null) => {
-    updateSettings({ theme, customTheme });
     setFormData({ ...formData, theme, customTheme });
     setHasChanges(true);
   };
@@ -130,7 +130,7 @@ export const SettingsPage = () => {
 
       {/* Configuración Avanzada */}
       <AdvancedSettingsComponent
-        advanced={formData.advanced || {
+        advanced={settings.advanced || {
           tradingRules: {
             maxTradesPerDay: null,
             maxTradesPerWeek: null,
@@ -154,9 +154,62 @@ export const SettingsPage = () => {
             hideMoney: false,
             showOnlyRMultiples: false,
           },
+          riskManagement: {
+            maxRiskPerTrade: null,
+            maxRiskDaily: null,
+            maxRiskWeekly: null,
+            maxDrawdown: null,
+            drawdownMode: 'warning',
+          },
+          discipline: {
+            cooldownAfterLoss: null,
+            maxTradesConsecutiveLoss: null,
+            forceSessionCloseOnCriticalRule: false,
+            persistentWarnings: true,
+          },
+          ui: {
+            strictRiskMode: false,
+            attenuateMetricsOnDrawdown: true,
+            showOnlySurvivalMetrics: false,
+            enableAnimations: true,
+            showGlobalRiskPanel: true,
+          },
+          insights: {
+            autoInsightsEnabled: true,
+            severityLevel: 'all',
+            maxVisibleInsights: 5,
+            updateFrequency: 'realtime',
+            allowBlockInsights: true,
+            blockedInsightIds: [],
+          },
+          ruleEngine: {
+            enabled: true,
+            rules: [],
+          },
+          sessions: {
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            allowedSessions: {
+              asian: true,
+              london: true,
+              'new-york': true,
+              overlap: true,
+              other: true,
+            },
+            allowedDays: {
+              monday: true,
+              tuesday: true,
+              wednesday: true,
+              thursday: true,
+              friday: true,
+              saturday: false,
+              sunday: false,
+            },
+            blockTradingOutsideSession: false,
+          },
         }}
         onChange={(advanced) => {
-          handleChange('advanced', advanced);
+          // Guardar automáticamente cada cambio - usar el objeto completo
+          updateSettings({ advanced });
         }}
       />
 

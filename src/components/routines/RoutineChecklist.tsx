@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Plus, Trash2, Edit2, Check } from 'lucide-react';
 import type { Routine, RoutineItem, RoutineType } from '@/types/Trading';
+import { useRoutineStore } from '@/store/routineStore';
 
 interface RoutineChecklistProps {
   routine: Routine | null;
@@ -60,8 +61,15 @@ export const RoutineChecklist: React.FC<RoutineChecklistProps> = ({
     setEditText('');
   };
 
+  const { getTodayExecution } = useRoutineStore();
+  const todayExecution = getTodayExecution();
+  const block = todayExecution.blocks[type];
+  
   const items = routine?.items || [];
-  const completedCount = items.filter(item => item.completed).length;
+  // Use daily execution completions instead of routine item completed status
+  const completedCount = items.filter(item => 
+    block.itemCompletions[item.id]?.completed || false
+  ).length;
   const totalCount = items.length;
   const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
@@ -112,7 +120,7 @@ export const RoutineChecklist: React.FC<RoutineChecklistProps> = ({
                 className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent/50"
               >
                 <Checkbox
-                  checked={item.completed}
+                  checked={block.itemCompletions[item.id]?.completed || false}
                   onChange={() => onToggleItem(item.id)}
                 />
                 {editingId === item.id ? (
@@ -137,10 +145,19 @@ export const RoutineChecklist: React.FC<RoutineChecklistProps> = ({
                 ) : (
                   <>
                     <span
-                      className={`flex-1 ${item.completed ? 'line-through text-muted-foreground' : ''}`}
+                      className={`flex-1 ${
+                        block.itemCompletions[item.id]?.completed 
+                          ? 'line-through text-muted-foreground' 
+                          : ''
+                      }`}
                     >
                       {item.text}
                     </span>
+                    {block.itemCompletions[item.id]?.note && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Nota: {block.itemCompletions[item.id].note}
+                      </div>
+                    )}
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"

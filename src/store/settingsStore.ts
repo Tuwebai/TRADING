@@ -4,9 +4,92 @@
  */
 
 import { create } from 'zustand';
-import type { Settings } from '@/types/Trading';
+import type { Settings, AdvancedSettings } from '@/types/Trading';
 import { settingsStorage } from '@/lib/storage';
 import { applyTheme } from '@/lib/themes';
+
+/**
+ * Get default advanced settings (same as in storage.ts)
+ */
+function getDefaultAdvancedSettings(): AdvancedSettings {
+  return {
+    tradingRules: {
+      maxTradesPerDay: null,
+      maxTradesPerWeek: null,
+      allowedTradingHours: {
+        enabled: false,
+        startHour: 9,
+        endHour: 17,
+      },
+      maxLotSize: null,
+      dailyProfitTarget: null,
+      dailyLossLimit: null,
+      psychologicalRules: [],
+    },
+    ultraDisciplinedMode: {
+      enabled: false,
+      blockOnRuleBreak: false,
+      blockedUntil: null,
+    },
+    studyMode: {
+      enabled: false,
+      hideMoney: false,
+      showOnlyRMultiples: false,
+    },
+    riskManagement: {
+      maxRiskPerTrade: null,
+      maxRiskDaily: null,
+      maxRiskWeekly: null,
+      maxDrawdown: null,
+      drawdownMode: 'warning',
+    },
+    discipline: {
+      cooldownAfterLoss: null,
+      maxTradesConsecutiveLoss: null,
+      forceSessionCloseOnCriticalRule: false,
+      persistentWarnings: true,
+    },
+    ui: {
+      strictRiskMode: false,
+      attenuateMetricsOnDrawdown: true,
+      showOnlySurvivalMetrics: false,
+      enableAnimations: true,
+      showGlobalRiskPanel: true,
+    },
+    insights: {
+      autoInsightsEnabled: true,
+      severityLevel: 'all',
+      maxVisibleInsights: 5,
+      updateFrequency: 'realtime',
+      allowBlockInsights: true,
+      blockedInsightIds: [],
+    },
+    ruleEngine: {
+      enabled: true,
+      rules: [],
+    },
+    sessions: {
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      allowedSessions: {
+        asian: true,
+        london: true,
+        'new-york': true,
+        overlap: true,
+        other: true,
+      },
+      allowedDays: {
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true,
+        saturday: false,
+        sunday: false,
+      },
+      blockTradingOutsideSession: false,
+    },
+  };
+}
 
 interface SettingsStore {
   settings: Settings;
@@ -28,31 +111,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     currentCapital: 10000,
     initialCapital: 10000,
     manualCapitalAdjustment: false,
-    advanced: {
-      tradingRules: {
-        maxTradesPerDay: null,
-        maxTradesPerWeek: null,
-        allowedTradingHours: {
-          enabled: false,
-          startHour: 9,
-          endHour: 17,
-        },
-        maxLotSize: null,
-        dailyProfitTarget: null,
-        dailyLossLimit: null,
-        psychologicalRules: [],
-      },
-      ultraDisciplinedMode: {
-        enabled: false,
-        blockOnRuleBreak: false,
-        blockedUntil: null,
-      },
-      studyMode: {
-        enabled: false,
-        hideMoney: false,
-        showOnlyRMultiples: false,
-      },
-    },
+    advanced: getDefaultAdvancedSettings(),
   },
   isLoading: false,
 
@@ -71,7 +130,26 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   updateSettings: (updates: Partial<Settings>) => {
-    const newSettings = { ...get().settings, ...updates };
+    const currentSettings = get().settings;
+    
+    // If advanced settings are provided, use them directly (component always sends complete object)
+    // Otherwise merge other settings normally
+    const newSettings: Settings = {
+      ...currentSettings,
+      ...updates,
+      // For advanced settings, if provided, use them directly (they're always complete from component)
+      // Otherwise keep current advanced settings
+      advanced: updates.advanced !== undefined 
+        ? updates.advanced 
+        : currentSettings.advanced,
+    };
+    
+    // Ensure advanced always exists
+    if (!newSettings.advanced) {
+      newSettings.advanced = getDefaultAdvancedSettings();
+    }
+    
+    // Save to storage immediately
     set({ settings: newSettings });
     settingsStorage.save(newSettings);
     

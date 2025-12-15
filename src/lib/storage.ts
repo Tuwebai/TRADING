@@ -11,7 +11,7 @@
  * 3. Update return types to handle async operations if needed
  */
 
-import type { Trade, Routine, Settings, TradeTemplate, TradingSetup } from '@/types/Trading';
+import type { Trade, Routine, Settings, TradeTemplate, TradingSetup, AdvancedSettings, DailyRoutineExecution } from '@/types/Trading';
 
 const STORAGE_KEYS = {
   TRADES: 'trading_log_trades',
@@ -19,6 +19,7 @@ const STORAGE_KEYS = {
   SETTINGS: 'trading_log_settings',
   TEMPLATES: 'trading_log_templates',
   SETUPS: 'trading_log_setups',
+  ROUTINE_EXECUTIONS: 'trading_log_routine_executions',
 } as const;
 
 /**
@@ -168,6 +169,195 @@ export const routineStorage = {
 };
 
 /**
+ * Daily routine execution storage operations
+ */
+export const routineExecutionStorage = {
+  /**
+   * Get all executions
+   */
+  getAll(): DailyRoutineExecution[] {
+    const storage = new StorageService();
+    return storage['load']<DailyRoutineExecution[]>(STORAGE_KEYS.ROUTINE_EXECUTIONS, []);
+  },
+
+  /**
+   * Save all executions
+   */
+  saveAll(executions: DailyRoutineExecution[]): void {
+    const storage = new StorageService();
+    storage['save'](STORAGE_KEYS.ROUTINE_EXECUTIONS, executions);
+  },
+
+  /**
+   * Get execution by date (YYYY-MM-DD)
+   */
+  getByDate(date: string): DailyRoutineExecution | null {
+    const executions = this.getAll();
+    return executions.find(exec => exec.date === date) || null;
+  },
+
+  /**
+   * Save or update an execution
+   */
+  save(execution: DailyRoutineExecution): void {
+    const executions = this.getAll();
+    const index = executions.findIndex(exec => exec.date === execution.date);
+    
+    const updated = {
+      ...execution,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (index === -1) {
+      executions.push(updated);
+    } else {
+      executions[index] = updated;
+    }
+    
+    this.saveAll(executions);
+  },
+};
+
+/**
+ * Get default advanced settings
+ */
+function getDefaultAdvancedSettings(): AdvancedSettings {
+  return {
+    tradingRules: {
+      maxTradesPerDay: null,
+      maxTradesPerWeek: null,
+      allowedTradingHours: {
+        enabled: false,
+        startHour: 9,
+        endHour: 17,
+      },
+      maxLotSize: null,
+      dailyProfitTarget: null,
+      dailyLossLimit: null,
+      psychologicalRules: [],
+    },
+    ultraDisciplinedMode: {
+      enabled: false,
+      blockOnRuleBreak: false,
+      blockedUntil: null,
+    },
+    studyMode: {
+      enabled: false,
+      hideMoney: false,
+      showOnlyRMultiples: false,
+    },
+    riskManagement: {
+      maxRiskPerTrade: null,
+      maxRiskDaily: null,
+      maxRiskWeekly: null,
+      maxDrawdown: null,
+      drawdownMode: 'warning',
+    },
+    discipline: {
+      cooldownAfterLoss: null,
+      maxTradesConsecutiveLoss: null,
+      forceSessionCloseOnCriticalRule: false,
+      persistentWarnings: true,
+    },
+    ui: {
+      strictRiskMode: false,
+      attenuateMetricsOnDrawdown: true,
+      showOnlySurvivalMetrics: false,
+      enableAnimations: true,
+      showGlobalRiskPanel: true,
+    },
+    insights: {
+      autoInsightsEnabled: true,
+      severityLevel: 'all',
+      maxVisibleInsights: 5,
+      updateFrequency: 'realtime',
+      allowBlockInsights: true,
+      blockedInsightIds: [],
+    },
+    ruleEngine: {
+      enabled: true,
+      rules: [],
+    },
+    sessions: {
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      allowedSessions: {
+        asian: true,
+        london: true,
+        'new-york': true,
+        overlap: true,
+        other: true,
+      },
+      allowedDays: {
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true,
+        saturday: false,
+        sunday: false,
+      },
+      blockTradingOutsideSession: false,
+    },
+  };
+}
+
+/**
+ * Merge advanced settings with defaults (for migration)
+ */
+function mergeAdvancedSettings(loaded: Partial<AdvancedSettings> | undefined): AdvancedSettings {
+  const defaults = getDefaultAdvancedSettings();
+  if (!loaded) return defaults;
+  
+  // Deep merge each nested object
+  return {
+    ...defaults,
+    ...loaded,
+    tradingRules: loaded.tradingRules 
+      ? { ...defaults.tradingRules, ...loaded.tradingRules }
+      : defaults.tradingRules,
+    ultraDisciplinedMode: loaded.ultraDisciplinedMode
+      ? { ...defaults.ultraDisciplinedMode, ...loaded.ultraDisciplinedMode }
+      : defaults.ultraDisciplinedMode,
+    studyMode: loaded.studyMode
+      ? { ...defaults.studyMode, ...loaded.studyMode }
+      : defaults.studyMode,
+    riskManagement: loaded.riskManagement
+      ? { ...defaults.riskManagement, ...loaded.riskManagement }
+      : defaults.riskManagement,
+    discipline: loaded.discipline
+      ? { ...defaults.discipline, ...loaded.discipline }
+      : defaults.discipline,
+    ui: loaded.ui
+      ? { ...defaults.ui, ...loaded.ui }
+      : defaults.ui,
+    insights: loaded.insights
+      ? { ...defaults.insights, ...loaded.insights }
+      : defaults.insights,
+    ruleEngine: loaded.ruleEngine
+      ? { 
+          ...defaults.ruleEngine, 
+          ...loaded.ruleEngine,
+          rules: loaded.ruleEngine.rules !== undefined 
+            ? loaded.ruleEngine.rules 
+            : defaults.ruleEngine.rules
+        }
+      : defaults.ruleEngine,
+    sessions: loaded.sessions
+      ? { 
+          ...defaults.sessions, 
+          ...loaded.sessions,
+          allowedSessions: loaded.sessions.allowedSessions
+            ? { ...defaults.sessions.allowedSessions, ...loaded.sessions.allowedSessions }
+            : defaults.sessions.allowedSessions,
+          allowedDays: loaded.sessions.allowedDays
+            ? { ...defaults.sessions.allowedDays, ...loaded.sessions.allowedDays }
+            : defaults.sessions.allowedDays
+        }
+      : defaults.sessions,
+  };
+}
+
+/**
  * Settings storage operations
  */
 export const settingsStorage = {
@@ -185,36 +375,14 @@ export const settingsStorage = {
       currentCapital: 10000,
       initialCapital: 10000,
       manualCapitalAdjustment: false,
-      advanced: {
-        tradingRules: {
-          maxTradesPerDay: null,
-          maxTradesPerWeek: null,
-          allowedTradingHours: {
-            enabled: false,
-            startHour: 9,
-            endHour: 17,
-          },
-          maxLotSize: null,
-          dailyProfitTarget: null,
-          dailyLossLimit: null,
-          psychologicalRules: [],
-        },
-        ultraDisciplinedMode: {
-          enabled: false,
-          blockOnRuleBreak: false,
-          blockedUntil: null,
-        },
-        studyMode: {
-          enabled: false,
-          hideMoney: false,
-          showOnlyRMultiples: false,
-        },
-      },
+      advanced: getDefaultAdvancedSettings(),
     };
     const loaded = storage['load']<Settings>(STORAGE_KEYS.SETTINGS, defaultSettings);
-    // Ensure advanced settings exist
+    // Ensure advanced settings exist and merge with defaults for migration
     if (!loaded.advanced) {
-      loaded.advanced = defaultSettings.advanced;
+      loaded.advanced = getDefaultAdvancedSettings();
+    } else {
+      loaded.advanced = mergeAdvancedSettings(loaded.advanced);
     }
     return loaded;
   },
@@ -364,32 +532,12 @@ export const initializeStorage = (): void => {
       currentCapital: 10000,
       initialCapital: 10000,
       manualCapitalAdjustment: false,
-      advanced: {
-        tradingRules: {
-          maxTradesPerDay: null,
-          maxTradesPerWeek: null,
-          allowedTradingHours: {
-            enabled: false,
-            startHour: 9,
-            endHour: 17,
-          },
-          maxLotSize: null,
-          dailyProfitTarget: null,
-          dailyLossLimit: null,
-          psychologicalRules: [],
-        },
-        ultraDisciplinedMode: {
-          enabled: false,
-          blockOnRuleBreak: false,
-          blockedUntil: null,
-        },
-        studyMode: {
-          enabled: false,
-          hideMoney: false,
-          showOnlyRMultiples: false,
-        },
-      },
+      advanced: getDefaultAdvancedSettings(),
     });
+  } else if (settings.advanced) {
+    // Migrate existing settings to include new fields
+    settings.advanced = mergeAdvancedSettings(settings.advanced);
+    settingsStorage.save(settings);
   }
 };
 

@@ -118,6 +118,14 @@ export const TradesPage = () => {
     setCurrentFormData(undefined);
     // Check trading rules before adding trade
     if (!editingTrade) {
+      // 3️⃣ ENFORCEMENT: Check if pre-trade routine is complete
+      const preTradeCheck = isPreTradeComplete();
+      
+      if (!preTradeCheck.complete) {
+        alert(`🔴 CREACIÓN DE OPERACIÓN BLOQUEADA\n\n${preTradeCheck.message}\n\nDebes completar la Lista Pre-Operación al 100% antes de crear cualquier operación.\n\nVe a /routines para completar tu rutina.`);
+        return;
+      }
+      
       const violations = checkTradingRules(trades, settings, {
         positionSize: formData.positionSize,
         entryDate: formData.entryDate,

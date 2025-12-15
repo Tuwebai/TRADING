@@ -160,6 +160,51 @@ export interface RoutineItem {
   order: number;
   createdAt: string;
   updatedAt: string;
+  note?: string; // Nota corta opcional
+}
+
+/**
+ * Daily routine execution state
+ */
+export type RoutineBlockStatus = 'pending' | 'completed' | 'incomplete' | 'skipped';
+
+/**
+ * Daily routine execution record
+ */
+export interface DailyRoutineExecution {
+  date: string; // ISO date string (YYYY-MM-DD)
+  blocks: {
+    [key in RoutineType]: {
+      status: RoutineBlockStatus;
+      completedAt: string | null; // ISO timestamp
+      skippedAt: string | null; // ISO timestamp
+      skipReason: string | null; // Motivo obligatorio si se salta
+      itemCompletions: Record<string, {
+        completed: boolean;
+        completedAt: string | null;
+        note?: string;
+      }>;
+    };
+  };
+  endOfDay: {
+    marked: boolean;
+    markedAt: string | null;
+    isValid: boolean | null; // null = no marcado, true = válido, false = inválido
+    justification: string | null; // Obligatorio si inválido
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Post-trade structured data
+ */
+export interface PostTradeData {
+  respectedPlan: boolean; // ¿Respetaste el plan?
+  brokenRule: string | null; // Regla rota (si aplica)
+  emotionalState: EmotionType | null;
+  learning: string; // 1 aprendizaje obligatorio
+  completedAt: string; // ISO timestamp
 }
 
 /**
@@ -213,6 +258,88 @@ export interface TradingRules {
 }
 
 /**
+ * Risk management configuration
+ */
+export interface RiskManagementConfig {
+  maxRiskPerTrade: number | null; // % máximo por trade
+  maxRiskDaily: number | null; // % máximo diario
+  maxRiskWeekly: number | null; // % máximo semanal
+  maxDrawdown: number | null; // % máximo de drawdown permitido
+  drawdownMode: 'warning' | 'partial-block' | 'hard-stop'; // Modo de acción ante drawdown
+}
+
+/**
+ * Discipline and behavior configuration
+ */
+export interface DisciplineConfig {
+  cooldownAfterLoss: number | null; // Minutos de cooldown después de pérdida
+  maxTradesConsecutiveLoss: number | null; // Máx trades consecutivos en pérdida
+  forceSessionCloseOnCriticalRule: boolean; // Forzar cierre de sesión si se rompe regla crítica
+  persistentWarnings: boolean; // Activar/desactivar warnings persistentes
+}
+
+/**
+ * UI and visualization configuration
+ */
+export interface UIConfig {
+  strictRiskMode: boolean; // Modo estricto de riesgo (UI más sobria)
+  attenuateMetricsOnDrawdown: boolean; // Atenuar métricas positivas si hay drawdown crítico
+  showOnlySurvivalMetrics: boolean; // Mostrar solo métricas de supervivencia si riesgo > límite
+  enableAnimations: boolean; // Activar/desactivar animaciones
+  showGlobalRiskPanel: boolean; // Mostrar u ocultar panel de riesgo global
+}
+
+/**
+ * Insights and alerts configuration
+ */
+export interface InsightsConfig {
+  autoInsightsEnabled: boolean; // Activar/desactivar insights automáticos
+  severityLevel: 'critical' | 'important' | 'positive' | 'all'; // Nivel de severidad mostrado
+  maxVisibleInsights: number; // Máx insights visibles simultáneamente
+  updateFrequency: 'realtime' | 'daily' | 'weekly'; // Frecuencia de actualización
+  allowBlockInsights: boolean; // Permitir bloquear insights irrelevantes
+  blockedInsightIds: string[]; // IDs de insights bloqueados
+}
+
+/**
+ * Rule engine configuration
+ */
+export interface RuleEngineConfig {
+  enabled: boolean; // Activar/desactivar motor de reglas
+  rules: {
+    id: string;
+    name: string;
+    enabled: boolean;
+    severity: 'info' | 'warning' | 'block'; // Severidad de la regla
+    condition?: string; // Condición personalizada (ej: "if drawdown > X → reducir riesgo")
+  }[];
+}
+
+/**
+ * Trading sessions configuration
+ */
+export interface SessionsConfig {
+  timezone: string; // Zona horaria del trader (ej: "America/New_York")
+  allowedSessions: {
+    asian: boolean;
+    london: boolean;
+    'new-york': boolean;
+    overlap: boolean;
+    other: boolean;
+  };
+  allowedDays: {
+    monday: boolean;
+    tuesday: boolean;
+    wednesday: boolean;
+    thursday: boolean;
+    friday: boolean;
+    saturday: boolean;
+    sunday: boolean;
+  };
+  blockTradingOutsideSession: boolean; // Bloquear trading fuera de sesión
+}
+
+/**
  * Advanced settings
  */
 export interface AdvancedSettings {
@@ -232,6 +359,24 @@ export interface AdvancedSettings {
     hideMoney: boolean; // Oculta montos de dinero
     showOnlyRMultiples: boolean; // Muestra solo R múltiples
   };
+
+  // Gestión de riesgo global
+  riskManagement: RiskManagementConfig;
+
+  // Disciplina y comportamiento
+  discipline: DisciplineConfig;
+
+  // Visualización y UI
+  ui: UIConfig;
+
+  // Insights y alertas
+  insights: InsightsConfig;
+
+  // Motor de reglas
+  ruleEngine: RuleEngineConfig;
+
+  // Sesiones y datos
+  sessions: SessionsConfig;
 }
 
 /**

@@ -223,6 +223,131 @@ export function evaluateTradeRules(
     });
   }
 
+  // Rule 7: Max Risk Per Trade (from risk management config)
+  const riskManagement = settings.advanced?.riskManagement;
+  if (riskManagement?.maxRiskPerTrade !== null && trade.stopLoss) {
+    const stopLoss = trade.stopLoss;
+    const priceDiff = Math.abs(trade.entryPrice - stopLoss);
+    const leverage = trade.leverage || 1;
+    const riskAmount = priceDiff * trade.positionSize * leverage;
+    const riskPercent = currentCapital > 0 ? (riskAmount / currentCapital) * 100 : 0;
+    const maxRisk = riskManagement.maxRiskPerTrade;
+    const respected = riskPercent <= maxRisk;
+    
+    evaluatedRules.push({
+      id: 'max-risk-per-trade-global',
+      ruleName: 'Riesgo Máximo por Trade (Global)',
+      ruleKey: 'maxRiskPerTrade',
+      respected,
+      expectedValue: `≤ ${maxRisk}%`,
+      actualValue: `${riskPercent.toFixed(2)}%`,
+      severity: 'critical',
+    });
+
+    if (!respected) {
+      violatedRules.push({
+        id: 'max-risk-per-trade-global',
+        ruleName: 'Riesgo Máximo por Trade (Global)',
+        ruleKey: 'maxRiskPerTrade',
+        expectedValue: `≤ ${maxRisk}%`,
+        actualValue: `${riskPercent.toFixed(2)}%`,
+        severity: 'critical',
+        message: `Riesgo (${riskPercent.toFixed(2)}%) excede el límite global permitido (${maxRisk}%)`,
+      });
+    }
+  }
+
+  // Rule 8: Max Daily Risk (from risk management config)
+  if (riskManagement?.maxRiskDaily !== null && trade.stopLoss) {
+    const todayTrades = allTrades.filter(t => {
+      const tDate = new Date(t.entryDate);
+      tDate.setHours(0, 0, 0, 0);
+      return tDate.getTime() === today.getTime() && t.id !== trade.id;
+    });
+    
+    // Calculate total risk for today including this trade
+    let totalDailyRisk = 0;
+    todayTrades.forEach(t => {
+      if (t.stopLoss) {
+        const priceDiff = Math.abs(t.entryPrice - t.stopLoss);
+        const leverage = t.leverage || 1;
+        const riskAmount = priceDiff * t.positionSize * leverage;
+        totalDailyRisk += riskAmount;
+      }
+    });
+    
+    if (trade.stopLoss) {
+      const priceDiff = Math.abs(trade.entryPrice - trade.stopLoss);
+      const leverage = trade.leverage || 1;
+      const riskAmount = priceDiff * trade.positionSize * leverage;
+      totalDailyRisk += riskAmount;
+    }
+    
+    const totalDailyRiskPercent = currentCapital > 0 ? (totalDailyRisk / currentCapital) * 100 : 0;
+    const maxDailyRisk = riskManagement.maxRiskDaily;
+    const respected = totalDailyRiskPercent <= maxDailyRisk;
+    
+    evaluatedRules.push({
+      id: 'max-risk-daily',
+      ruleName: 'Riesgo Máximo Diario',
+      ruleKey: 'maxRiskDaily',
+      respected,
+      expectedValue: `≤ ${maxDailyRisk}%`,
+      actualValue: `${totalDailyRiskPercent.toFixed(2)}%`,
+      severity: 'critical',
+    });
+
+    if (!respected) {
+      violatedRules.push({
+        id: 'max-risk-daily',
+        ruleName: 'Riesgo Máximo Diario',
+        ruleKey: 'maxRiskDaily',
+        expectedValue: `≤ ${maxDailyRisk}%`,
+        actualValue: `${totalDailyRiskPercent.toFixed(2)}%`,
+        severity: 'critical',
+        message: `Riesgo diario acumulado (${totalDailyRiskPercent.toFixed(2)}%) excede el límite permitido (${maxDailyRisk}%)`,
+      });
+    }
+  }
+
+  // Rule 9: Trading Sessions (from sessions config)
+  const sessions = settings.advanced?.sessions;
+  if (sessions?.blockTradingOutsideSession) {
+    const tradeDate = new Date(trade.entryDate);
+    const tradeDay = tradeDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+    const dayName = dayNames[tradeDay];
+    const isDayAllowed = sessions.allowedDays[dayName];
+    
+    // Check if session is allowed (simplified - would need timezone conversion for production)
+    const tradeSession = trade.session || 'other';
+    const isSessionAllowed = sessions.allowedSessions[tradeSession as keyof typeof sessions.allowedSessions] ?? true;
+    
+    const respected = isDayAllowed && isSessionAllowed;
+    
+    evaluatedRules.push({
+      id: 'trading-sessions',
+      ruleName: 'Sesiones y Días Permitidos',
+      ruleKey: 'tradingSessions',
+      respected,
+      expectedValue: 'Día y sesión permitidos',
+      actualValue: `Día: ${dayName}, Sesión: ${tradeSession}`,
+      severity: 'critical',
+    });
+
+    if (!respected) {
+      violatedRules.push({
+        id: 'trading-sessions',
+        ruleName: 'Sesiones y Días Permitidos',
+        ruleKey: 'tradingSessions',
+        expectedValue: 'Día y sesión permitidos',
+        actualValue: `Día: ${dayName}, Sesión: ${tradeSession}`,
+        severity: 'critical',
+        message: `Trade en día o sesión no permitida`,
+      });
+    }
+  }
+
   // Determine overall status
   const hasCritical = violatedRules.some(v => v.severity === 'critical');
   const hasMinor = violatedRules.some(v => v.severity === 'minor');

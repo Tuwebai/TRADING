@@ -1,12 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTradeStore } from '@/store/tradeStore';
-import { Calculator, TrendingUp, AlertTriangle, DollarSign, Wallet, TrendingDown, BarChart3 } from 'lucide-react';
+import { 
+  Calculator, 
+  TrendingUp, 
+  AlertTriangle, 
+  DollarSign, 
+  Wallet, 
+  TrendingDown, 
+  BarChart3,
+  Shield,
+  Activity,
+  PlayCircle,
+  Settings,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Info
+} from 'lucide-react';
+import { 
+  calculateGlobalRiskStatus, 
+  calculateRealTimeRiskMetrics, 
+  simulateTradeImpact,
+  checkTradeCalculation 
+} from '@/lib/riskControl';
+import { evaluateTradeRules } from '@/lib/tradeRuleEvaluation';
+import { Link } from 'react-router-dom';
 
 type CalculationMethod = 'fixed' | 'percentage' | 'kelly' | 'risk-reward';
 
@@ -44,6 +69,8 @@ export const CapitalManagementPage = () => {
   const [kellyAvgLoss, setKellyAvgLoss] = useState<number>(0);
 
   const [calculation, setCalculation] = useState<PositionCalculation | null>(null);
+  const [simulationMode, setSimulationMode] = useState(false);
+  const [simulationResult, setSimulationResult] = useState<any>(null);
 
   useEffect(() => {
     loadSettings();
@@ -127,6 +154,43 @@ export const CapitalManagementPage = () => {
 
   const capitalData = calculateCapitalExposure();
 
+  // Calculate global risk status
+  const globalRiskStatus = useMemo(() => 
+    calculateGlobalRiskStatus(trades, settings), 
+    [trades, settings]
+  );
+
+  // Calculate real-time risk metrics
+  const realTimeRisk = useMemo(() => 
+    calculateRealTimeRiskMetrics(trades, settings), 
+    [trades, settings]
+  );
+
+  // Get active rules
+  const activeRules = useMemo(() => {
+    const rules = settings.advanced?.tradingRules;
+    const riskManagement = settings.advanced?.riskManagement;
+    const active: Array<{ name: string; value: string | number | null; severity: 'info' | 'warning' | 'block' }> = [];
+
+    if (rules?.maxTradesPerDay !== null) {
+      active.push({ name: 'Máximo de Trades Diarios', value: rules.maxTradesPerDay, severity: 'info' });
+    }
+    if (rules?.maxTradesPerWeek !== null) {
+      active.push({ name: 'Máximo de Trades Semanales', value: rules.maxTradesPerWeek, severity: 'info' });
+    }
+    if (riskManagement?.maxRiskPerTrade !== null) {
+      active.push({ name: 'Riesgo Máximo por Trade', value: `${riskManagement.maxRiskPerTrade}%`, severity: 'warning' });
+    }
+    if (riskManagement?.maxRiskDaily !== null) {
+      active.push({ name: 'Riesgo Máximo Diario', value: `${riskManagement.maxRiskDaily}%`, severity: 'warning' });
+    }
+    if (riskManagement?.maxDrawdown !== null) {
+      active.push({ name: 'Drawdown Máximo', value: `${riskManagement.maxDrawdown}%`, severity: 'block' });
+    }
+
+    return active;
+  }, [settings]);
+
   const calculatePosition = () => {
     if (!entryPrice || !stopLoss || accountSize <= 0) {
       return;
@@ -187,14 +251,47 @@ export const CapitalManagementPage = () => {
       riskRewardRatio = profitDifference / lossDifference;
     }
 
-    setCalculation({
+    const calcResult = {
       positionSize: Math.round(positionSize * 100) / 100,
       riskAmount: Math.round(riskAmount * 100) / 100,
       riskPercentage: Math.round(riskPercentage * 100) / 100,
       maxLoss: Math.round(maxLoss * 100) / 100,
       potentialProfit: Math.round(potentialProfit * 100) / 100,
       riskRewardRatio: Math.round(riskRewardRatio * 100) / 100,
-    });
+    };
+
+    setCalculation(calcResult);
+
+    // Check if calculation violates rules
+    const validation = checkTradeCalculation(
+      {
+        positionSize: calcResult.positionSize,
+        riskAmount: calcResult.riskAmount,
+        riskPercentage: calcResult.riskPercentage,
+        entryPrice,
+        stopLoss,
+      },
+      trades,
+      settings
+    );
+
+    // If simulation mode, calculate impact
+    if (simulationMode && entryPrice && stopLoss) {
+      const impact = simulateTradeImpact(
+        {
+          entryPrice,
+          stopLoss,
+          takeProfit: takeProfit || undefined,
+          positionSize: calcResult.positionSize,
+          entryDate: new Date().toISOString(),
+        },
+        trades,
+        settings
+      );
+      setSimulationResult(impact);
+    } else {
+      setSimulationResult(null);
+    }
   };
 
   const handleSaveToSettings = () => {
@@ -205,11 +302,150 @@ export const CapitalManagementPage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Gestión de Capital y Riesgo</h1>
+        <h1 className="text-3xl font-bold">Centro de Control de Riesgo</h1>
         <p className="text-muted-foreground mt-1">
-          Calcula el tamaño óptimo de posición basado en tu gestión de riesgo
+          Monitoreo en tiempo real, cálculo condicionado y simulación de impacto
         </p>
       </div>
+
+      {/* 1️⃣ RIESGO GLOBAL - Bloque Superior Fijo */}
+      <Card className={`border-2 ${
+        globalRiskStatus.status === 'blocked' ? 'border-destructive' :
+        globalRiskStatus.status === 'warning' ? 'border-yellow-500' :
+        'border-green-500'
+      }`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Estado de Riesgo Global
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="p-4 border rounded-lg">
+              <div className="text-sm text-muted-foreground mb-1">Riesgo por Trade Permitido</div>
+              <div className="text-2xl font-bold">
+                {globalRiskStatus.riskPerTradeAllowed !== null 
+                  ? `${globalRiskStatus.riskPerTradeAllowed}%`
+                  : 'Sin límite'}
+              </div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <div className="text-sm text-muted-foreground mb-1">Riesgo Diario Permitido</div>
+              <div className="text-2xl font-bold">
+                {globalRiskStatus.riskDailyAllowed !== null 
+                  ? `${globalRiskStatus.riskDailyAllowed}%`
+                  : 'Sin límite'}
+              </div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <div className="text-sm text-muted-foreground mb-1">Drawdown Máximo</div>
+              <div className="text-2xl font-bold">
+                {globalRiskStatus.drawdownMaxAllowed !== null 
+                  ? `${globalRiskStatus.drawdownMaxAllowed}%`
+                  : 'Sin límite'}
+              </div>
+            </div>
+            <div className={`p-4 border rounded-lg flex flex-col items-center justify-center ${
+              globalRiskStatus.status === 'blocked' ? 'bg-destructive/10 border-destructive' :
+              globalRiskStatus.status === 'warning' ? 'bg-yellow-500/10 border-yellow-500' :
+              'bg-green-500/10 border-green-500'
+            }`}>
+              <div className="text-sm text-muted-foreground mb-2">Estado Actual</div>
+              <div className={`text-2xl font-bold flex items-center gap-2 ${
+                globalRiskStatus.status === 'blocked' ? 'text-destructive' :
+                globalRiskStatus.status === 'warning' ? 'text-yellow-600' :
+                'text-green-600'
+              }`}>
+                {globalRiskStatus.status === 'blocked' ? <XCircle className="h-6 w-6" /> :
+                 globalRiskStatus.status === 'warning' ? <AlertTriangle className="h-6 w-6" /> :
+                 <CheckCircle2 className="h-6 w-6" />}
+                {globalRiskStatus.status === 'blocked' ? 'BLOQUEADO' :
+                 globalRiskStatus.status === 'warning' ? 'ADVERTENCIA' :
+                 'OK'}
+              </div>
+            </div>
+          </div>
+          {globalRiskStatus.reasons.length > 0 && (
+            <div className="mt-4 p-3 bg-muted rounded-lg">
+              <div className="text-sm font-semibold mb-2">Razones:</div>
+              <ul className="space-y-1">
+                {globalRiskStatus.reasons.map((reason, idx) => (
+                  <li key={idx} className="text-sm flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive" />
+                    {reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 2️⃣ RIESGO EN TIEMPO REAL */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Estado de Riesgo Actual
+          </CardTitle>
+          <CardDescription>
+            Métricas actualizadas en tiempo real
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="p-4 border rounded-lg">
+              <div className="text-sm text-muted-foreground mb-1">Riesgo Usado Hoy</div>
+              <div className="text-2xl font-bold">
+                {realTimeRisk.riskUsedToday.percent.toFixed(2)}%
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {realTimeRisk.riskUsedToday.amount.toLocaleString()} {settings.baseCurrency}
+              </div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <div className="text-sm text-muted-foreground mb-1">Riesgo Restante</div>
+              <div className="text-2xl font-bold text-green-600">
+                {realTimeRisk.riskRemaining.percent.toFixed(2)}%
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {realTimeRisk.riskRemaining.amount.toLocaleString()} {settings.baseCurrency}
+              </div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <div className="text-sm text-muted-foreground mb-1">Trades Restantes Hoy</div>
+              <div className="text-2xl font-bold">
+                {realTimeRisk.tradesRemainingToday !== null 
+                  ? realTimeRisk.tradesRemainingToday
+                  : 'Sin límite'}
+              </div>
+            </div>
+          </div>
+          
+          {/* Barra visual de margen */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Margen de Riesgo Diario</span>
+              <span className="text-sm font-bold">
+                {realTimeRisk.marginBar.used.toFixed(2)}% / {realTimeRisk.marginBar.limit}%
+              </span>
+            </div>
+            <div className="w-full h-4 bg-muted rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all ${
+                  realTimeRisk.marginBar.used > realTimeRisk.marginBar.limit 
+                    ? 'bg-destructive' 
+                    : realTimeRisk.marginBar.used > realTimeRisk.marginBar.limit * 0.8
+                    ? 'bg-yellow-500'
+                    : 'bg-green-500'
+                }`}
+                style={{ width: `${Math.min((realTimeRisk.marginBar.used / realTimeRisk.marginBar.limit) * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Panel de Entrada */}
@@ -373,10 +609,36 @@ export const CapitalManagementPage = () => {
               </p>
             </div>
 
-            <Button onClick={calculatePosition} className="w-full">
+            <div className="flex items-center gap-2 mb-2">
+              <Checkbox
+                id="simulationMode"
+                checked={simulationMode}
+                onChange={(e) => setSimulationMode(e.target.checked)}
+              />
+              <Label htmlFor="simulationMode" className="text-sm">
+                Modo Simulación (ver impacto antes de calcular)
+              </Label>
+            </div>
+
+            <Button 
+              onClick={calculatePosition} 
+              className="w-full"
+              disabled={globalRiskStatus.status === 'blocked'}
+            >
               <Calculator className="h-4 w-4 mr-2" />
-              Calcular Tamaño de Posición
+              {globalRiskStatus.status === 'blocked' 
+                ? 'Trading Bloqueado - Revisa las Reglas'
+                : 'Calcular Tamaño de Posición'}
             </Button>
+            
+            {globalRiskStatus.status === 'blocked' && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
+                <div className="font-semibold mb-1">⚠️ Trading Bloqueado</div>
+                <div className="text-xs">
+                  {globalRiskStatus.reasons.join('. ')}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -489,6 +751,104 @@ export const CapitalManagementPage = () => {
                   </ul>
                 </div>
 
+                {/* Validación de reglas */}
+                {calculation && (() => {
+                  const validation = checkTradeCalculation(
+                    {
+                      positionSize: calculation.positionSize,
+                      riskAmount: calculation.riskAmount,
+                      riskPercentage: calculation.riskPercentage,
+                      entryPrice,
+                      stopLoss,
+                    },
+                    trades,
+                    settings
+                  );
+
+                  if (!validation.allowed) {
+                    return (
+                      <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                        <div className="font-semibold text-destructive mb-2">⚠️ Violaciones de Reglas Detectadas</div>
+                        <ul className="space-y-1 mb-3">
+                          {validation.violations.map((v, idx) => (
+                            <li key={idx} className="text-sm flex items-start gap-2">
+                              <XCircle className="h-4 w-4 mt-0.5 text-destructive" />
+                              <span>{v.message}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        {validation.suggestedSize && (
+                          <div className="mt-3 p-2 bg-muted rounded text-sm">
+                            <div className="font-semibold mb-1">💡 Tamaño Sugerido:</div>
+                            <div className="text-lg font-bold">{validation.suggestedSize.toFixed(2)} unidades</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Este tamaño respeta tus límites de riesgo
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Modo Simulación */}
+                {simulationMode && simulationResult && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="font-semibold mb-3 flex items-center gap-2">
+                      <PlayCircle className="h-5 w-5" />
+                      Impacto Simulado del Trade
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-sm font-medium mb-1">Impacto en Riesgo Diario</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">{simulationResult.impactOnDailyRisk.before.toFixed(2)}%</span>
+                          <span>→</span>
+                          <span className={`text-sm font-bold ${
+                            simulationResult.impactOnDailyRisk.after > (settings.advanced?.riskManagement?.maxRiskDaily ?? 100)
+                              ? 'text-destructive'
+                              : 'text-green-600'
+                          }`}>
+                            {simulationResult.impactOnDailyRisk.after.toFixed(2)}%
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            (+{simulationResult.impactOnDailyRisk.change.toFixed(2)}%)
+                          </span>
+                        </div>
+                      </div>
+                      {simulationResult.rulesThatWouldActivate.length > 0 && (
+                        <div>
+                          <div className="text-sm font-medium mb-1">Reglas que se Activarían</div>
+                          <ul className="space-y-1">
+                            {simulationResult.rulesThatWouldActivate.map((rule: any, idx: number) => (
+                              <li key={idx} className="text-xs flex items-start gap-2">
+                                <AlertTriangle className={`h-3 w-3 mt-0.5 ${
+                                  rule.severity === 'critical' ? 'text-destructive' : 'text-yellow-600'
+                                }`} />
+                                <span>{rule.message}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className={`p-2 rounded ${
+                        simulationResult.finalStatus === 'blocked' ? 'bg-destructive/10 border border-destructive/20' :
+                        simulationResult.finalStatus === 'warning' ? 'bg-yellow-500/10 border border-yellow-500/20' :
+                        'bg-green-500/10 border border-green-500/20'
+                      }`}>
+                        <div className="text-sm font-semibold">
+                          Estado Final: {
+                            simulationResult.finalStatus === 'blocked' ? '🔴 BLOQUEADO' :
+                            simulationResult.finalStatus === 'warning' ? '🟡 ADVERTENCIA' :
+                            '🟢 PERMITIDO'
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <Button variant="outline" className="w-full" onClick={handleSaveToSettings}>
                   Usar en Nueva Operación
                 </Button>
@@ -502,6 +862,58 @@ export const CapitalManagementPage = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* 6️⃣ REGLAS ACTIVAS VISIBLES */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Reglas de Riesgo en Curso
+          </CardTitle>
+          <CardDescription>
+            Configuraciones activas que gobiernan tu trading
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {activeRules.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeRules.map((rule, idx) => (
+                <div key={idx} className="p-3 border rounded-lg">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium">{rule.name}</span>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      rule.severity === 'block' ? 'bg-destructive/10 text-destructive' :
+                      rule.severity === 'warning' ? 'bg-yellow-500/10 text-yellow-600' :
+                      'bg-blue-500/10 text-blue-600'
+                    }`}>
+                      {rule.severity === 'block' ? 'Bloqueo' :
+                       rule.severity === 'warning' ? 'Advertencia' :
+                       'Info'}
+                    </span>
+                  </div>
+                  <div className="text-lg font-bold">{rule.value}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Info className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No hay reglas de riesgo configuradas</p>
+              <Link to="/settings" className="text-sm text-primary hover:underline mt-2 inline-block">
+                Configurar reglas →
+              </Link>
+            </div>
+          )}
+          <div className="mt-4 pt-4 border-t">
+            <Link to="/settings">
+              <Button variant="outline" className="w-full">
+                <Settings className="h-4 w-4 mr-2" />
+                Ir a Configuración Avanzada
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Gestión de Capital */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -671,67 +1083,108 @@ export const CapitalManagementPage = () => {
               Exposición por Activo
             </CardTitle>
             <CardDescription>
-              Límites de exposición y distribución por instrumento
+              Límites configurados, exposición actual y simulada
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-2 p-3 bg-muted rounded-lg">
               <div className="flex items-center justify-between">
                 <Label>Límite por Activo (%)</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={maxExposurePerAsset}
-                  onChange={(e) => setMaxExposurePerAsset(parseFloat(e.target.value) || 0)}
-                  className="w-24"
-                />
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">{maxExposurePerAsset}%</span>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={maxExposurePerAsset}
+                    onChange={(e) => setMaxExposurePerAsset(parseFloat(e.target.value) || 0)}
+                    className="w-24"
+                  />
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <Label>Límite Total (%)</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={maxTotalExposure}
-                  onChange={(e) => setMaxTotalExposure(parseFloat(e.target.value) || 0)}
-                  className="w-24"
-                />
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">{maxTotalExposure}%</span>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={maxTotalExposure}
+                    onChange={(e) => setMaxTotalExposure(parseFloat(e.target.value) || 0)}
+                    className="w-24"
+                  />
+                </div>
               </div>
             </div>
 
             {capitalData.exposureByAsset.length > 0 ? (
               <div className="space-y-3">
-                {capitalData.exposureByAsset.map((assetData) => (
-                  <div key={assetData.asset} className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium">{assetData.asset}</span>
-                      <span className={`text-sm font-bold ${
-                        assetData.exposure > maxExposurePerAsset 
-                          ? 'text-destructive' 
-                          : assetData.exposure > maxExposurePerAsset * 0.8
-                          ? 'text-yellow-600'
-                          : 'text-profit'
-                      }`}>
-                        {assetData.exposure.toFixed(2)}%
-                      </span>
+                {capitalData.exposureByAsset.map((assetData) => {
+                  // Calculate simulated exposure if calculation exists and matches asset
+                  const simulatedExposure = calculation && entryPrice && stopLoss
+                    ? (() => {
+                        const priceDiff = Math.abs(entryPrice - stopLoss);
+                        const riskAmount = priceDiff * calculation.positionSize;
+                        const simulatedPercent = capitalData.baseCapital > 0 
+                          ? ((assetData.totalRisk + riskAmount) / capitalData.baseCapital) * 100
+                          : assetData.exposure;
+                        return simulatedPercent;
+                      })()
+                    : null;
+
+                  return (
+                    <div key={assetData.asset} className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">{assetData.asset}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-bold ${
+                            assetData.exposure > maxExposurePerAsset 
+                              ? 'text-destructive' 
+                              : assetData.exposure > maxExposurePerAsset * 0.8
+                              ? 'text-yellow-600'
+                              : 'text-profit'
+                          }`}>
+                            {assetData.exposure.toFixed(2)}%
+                          </span>
+                          {simulatedExposure !== null && (
+                            <span className="text-xs text-muted-foreground">
+                              → {simulatedExposure.toFixed(2)}% (simulado)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="w-full h-2 bg-muted rounded-full overflow-hidden mb-1 relative">
+                        <div
+                          className={`h-full transition-all ${
+                            assetData.exposure > maxExposurePerAsset 
+                              ? 'bg-destructive' 
+                              : assetData.exposure > maxExposurePerAsset * 0.8
+                              ? 'bg-yellow-500'
+                              : 'bg-primary'
+                          }`}
+                          style={{ width: `${Math.min((assetData.exposure / maxExposurePerAsset) * 100, 100)}%` }}
+                        />
+                        {simulatedExposure !== null && simulatedExposure > assetData.exposure && (
+                          <div
+                            className="h-full bg-blue-500/50 absolute top-0 transition-all"
+                            style={{ 
+                              left: `${(assetData.exposure / maxExposurePerAsset) * 100}%`,
+                              width: `${Math.min(((simulatedExposure - assetData.exposure) / maxExposurePerAsset) * 100, 100)}%`
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{assetData.trades.length} operación(es) abierta(s)</span>
+                        <span>{assetData.totalRisk.toLocaleString()} {settings.baseCurrency}</span>
+                      </div>
+                      {assetData.exposure > maxExposurePerAsset && (
+                        <div className="mt-2 p-2 bg-destructive/10 border border-destructive/20 rounded text-xs text-destructive">
+                          ⚠️ Concentración excesiva: {assetData.exposure.toFixed(2)}% excede {maxExposurePerAsset}%
+                        </div>
+                      )}
                     </div>
-                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden mb-1">
-                      <div
-                        className={`h-full transition-all ${
-                          assetData.exposure > maxExposurePerAsset 
-                            ? 'bg-destructive' 
-                            : assetData.exposure > maxExposurePerAsset * 0.8
-                            ? 'bg-yellow-500'
-                            : 'bg-primary'
-                        }`}
-                        style={{ width: `${Math.min((assetData.exposure / maxExposurePerAsset) * 100, 100)}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{assetData.trades.length} operación(es) abierta(s)</span>
-                      <span>{assetData.totalRisk.toLocaleString()} {settings.baseCurrency}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
@@ -769,6 +1222,139 @@ export const CapitalManagementPage = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* 7️⃣ HISTORIAL DE CONTROL */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Historial de Control
+          </CardTitle>
+          <CardDescription>
+            Registro de trades bloqueados, pausas forzadas y reglas activadas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {/* Trades bloqueados hoy */}
+            {(() => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const todayTrades = trades.filter(t => {
+                const tradeDate = new Date(t.entryDate);
+                tradeDate.setHours(0, 0, 0, 0);
+                return tradeDate.getTime() === today.getTime();
+              });
+              
+              const blockedTrades = todayTrades.filter(t => 
+                t.violatedRules && t.violatedRules.length > 0 && 
+                t.violatedRules.some(r => r.severity === 'critical')
+              );
+
+              if (blockedTrades.length > 0) {
+                return (
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <div className="font-semibold text-destructive mb-2">
+                      Trades Bloqueados Hoy: {blockedTrades.length}
+                    </div>
+                    <ul className="space-y-1 text-sm">
+                      {blockedTrades.map(trade => (
+                        <li key={trade.id} className="flex items-start gap-2">
+                          <XCircle className="h-4 w-4 mt-0.5 text-destructive" />
+                          <div>
+                            <div className="font-medium">{trade.asset}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {trade.violatedRules?.map(r => r.message).join(', ')}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Estado de bloqueo */}
+            {globalRiskStatus.status === 'blocked' && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <div className="font-semibold text-destructive mb-1">Pausa Forzada Activa</div>
+                <div className="text-sm text-muted-foreground">
+                  {settings.advanced?.ultraDisciplinedMode?.blockedUntil 
+                    ? `Bloqueado hasta: ${new Date(settings.advanced.ultraDisciplinedMode.blockedUntil).toLocaleString('es-ES')}`
+                    : 'Trading bloqueado por violación de reglas críticas'}
+                </div>
+              </div>
+            )}
+
+            {/* Reglas activadas hoy */}
+            {(() => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const todayTrades = trades.filter(t => {
+                const tradeDate = new Date(t.entryDate);
+                tradeDate.setHours(0, 0, 0, 0);
+                return tradeDate.getTime() === today.getTime();
+              });
+              
+              const allViolations = todayTrades
+                .flatMap(t => t.violatedRules || [])
+                .filter((v, idx, arr) => arr.findIndex(a => a.id === v.id) === idx);
+
+              if (allViolations.length > 0) {
+                return (
+                  <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <div className="font-semibold text-yellow-600 mb-2">
+                      Reglas Activadas Hoy: {allViolations.length}
+                    </div>
+                    <ul className="space-y-1 text-sm">
+                      {allViolations.map(violation => (
+                        <li key={violation.id} className="flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 mt-0.5 text-yellow-600" />
+                          <div>
+                            <div className="font-medium">{violation.ruleName}</div>
+                            <div className="text-xs text-muted-foreground">{violation.message}</div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {(() => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const todayTrades = trades.filter(t => {
+                const tradeDate = new Date(t.entryDate);
+                tradeDate.setHours(0, 0, 0, 0);
+                return tradeDate.getTime() === today.getTime();
+              });
+              
+              const hasBlocked = todayTrades.some(t => 
+                t.violatedRules && t.violatedRules.length > 0 && 
+                t.violatedRules.some(r => r.severity === 'critical')
+              );
+              const isBlocked = globalRiskStatus.status === 'blocked';
+              const hasViolations = todayTrades.some(t => t.violatedRules && t.violatedRules.length > 0);
+
+              if (!hasBlocked && !isBlocked && !hasViolations) {
+                return (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <CheckCircle2 className="h-12 w-12 mx-auto mb-2 opacity-50 text-green-600" />
+                    <p className="text-sm">Sin eventos de control registrados hoy</p>
+                    <p className="text-xs mt-1">Todas las operaciones cumplen con las reglas</p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Información Educativa */}
       <Card>
