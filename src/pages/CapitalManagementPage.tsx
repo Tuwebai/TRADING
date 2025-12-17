@@ -30,7 +30,6 @@ import {
   simulateTradeImpact,
   checkTradeCalculation 
 } from '@/lib/riskControl';
-import { evaluateTradeRules } from '@/lib/tradeRuleEvaluation';
 import { Link } from 'react-router-dom';
 
 type CalculationMethod = 'fixed' | 'percentage' | 'kelly' | 'risk-reward';
@@ -172,19 +171,19 @@ export const CapitalManagementPage = () => {
     const riskManagement = settings.advanced?.riskManagement;
     const active: Array<{ name: string; value: string | number | null; severity: 'info' | 'warning' | 'block' }> = [];
 
-    if (rules?.maxTradesPerDay !== null) {
+    if (rules?.maxTradesPerDay !== null && rules) {
       active.push({ name: 'Máximo de Trades Diarios', value: rules.maxTradesPerDay, severity: 'info' });
     }
-    if (rules?.maxTradesPerWeek !== null) {
+    if (rules?.maxTradesPerWeek !== null && rules) {
       active.push({ name: 'Máximo de Trades Semanales', value: rules.maxTradesPerWeek, severity: 'info' });
     }
-    if (riskManagement?.maxRiskPerTrade !== null) {
+    if (riskManagement?.maxRiskPerTrade !== null && riskManagement) {
       active.push({ name: 'Riesgo Máximo por Trade', value: `${riskManagement.maxRiskPerTrade}%`, severity: 'warning' });
     }
-    if (riskManagement?.maxRiskDaily !== null) {
+    if (riskManagement?.maxRiskDaily !== null && riskManagement) {
       active.push({ name: 'Riesgo Máximo Diario', value: `${riskManagement.maxRiskDaily}%`, severity: 'warning' });
     }
-    if (riskManagement?.maxDrawdown !== null) {
+    if (riskManagement?.maxDrawdown !== null && riskManagement) {
       active.push({ name: 'Drawdown Máximo', value: `${riskManagement.maxDrawdown}%`, severity: 'block' });
     }
 
@@ -262,8 +261,8 @@ export const CapitalManagementPage = () => {
 
     setCalculation(calcResult);
 
-    // Check if calculation violates rules
-    const validation = checkTradeCalculation(
+    // Check if calculation violates rules (validation result stored but not used directly)
+    checkTradeCalculation(
       {
         positionSize: calcResult.positionSize,
         riskAmount: calcResult.riskAmount,
@@ -753,7 +752,7 @@ export const CapitalManagementPage = () => {
 
                 {/* Validación de reglas */}
                 {calculation && (() => {
-                  const validation = checkTradeCalculation(
+                  checkTradeCalculation(
                     {
                       positionSize: calculation.positionSize,
                       riskAmount: calculation.riskAmount,

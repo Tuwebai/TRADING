@@ -225,7 +225,7 @@ export function evaluateTradeRules(
 
   // Rule 7: Max Risk Per Trade (from risk management config)
   const riskManagement = settings.advanced?.riskManagement;
-  if (riskManagement?.maxRiskPerTrade !== null && trade.stopLoss) {
+  if (riskManagement?.maxRiskPerTrade !== null && riskManagement && trade.stopLoss) {
     const stopLoss = trade.stopLoss;
     const priceDiff = Math.abs(trade.entryPrice - stopLoss);
     const leverage = trade.leverage || 1;
@@ -258,7 +258,7 @@ export function evaluateTradeRules(
   }
 
   // Rule 8: Max Daily Risk (from risk management config)
-  if (riskManagement?.maxRiskDaily !== null && trade.stopLoss) {
+  if (riskManagement?.maxRiskDaily !== null && riskManagement && trade.stopLoss) {
     const todayTrades = allTrades.filter(t => {
       const tDate = new Date(t.entryDate);
       tDate.setHours(0, 0, 0, 0);
@@ -284,7 +284,7 @@ export function evaluateTradeRules(
     }
     
     const totalDailyRiskPercent = currentCapital > 0 ? (totalDailyRisk / currentCapital) * 100 : 0;
-    const maxDailyRisk = riskManagement.maxRiskDaily;
+    const maxDailyRisk = riskManagement?.maxRiskDaily;
     const respected = totalDailyRiskPercent <= maxDailyRisk;
     
     evaluatedRules.push({

@@ -7,7 +7,7 @@ import { create } from 'zustand';
 import type { Routine, RoutineItem, RoutineType, DailyRoutineExecution, RoutineBlockStatus, PostTradeData } from '@/types/Trading';
 import { routineStorage, routineExecutionStorage } from '@/lib/storage';
 import { generateId } from '@/lib/utils';
-import { getTodayExecution, getTodayDate, calculateBlockStatus } from '@/lib/routineDiscipline';
+import { getTodayExecution } from '@/lib/routineDiscipline';
 
 interface RoutineStore {
   routines: Routine[];
@@ -387,7 +387,7 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     get().loadDailyExecutions();
   },
 
-  savePostTradeData: (data: PostTradeData) => {
+  savePostTradeData: (_data: PostTradeData) => {
     // This would be stored separately or attached to trades
     // For now, we'll store it in the daily execution
     const execution = get().getTodayExecution();

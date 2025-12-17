@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/Input';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Plus, Trash2, Edit2, Check } from 'lucide-react';
-import type { Routine, RoutineItem, RoutineType, DailyRoutineExecution } from '@/types/Trading';
+import type { Routine, RoutineItem, RoutineType } from '@/types/Trading';
 import { useRoutineStore } from '@/store/routineStore';
 import { getTodayDate, getTodayExecution as getTodayExecutionLib } from '@/lib/routineDiscipline';
 

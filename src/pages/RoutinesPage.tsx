@@ -9,12 +9,9 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
-import { Checkbox } from '@/components/ui/Checkbox';
 import { 
   Calendar, 
   Clock, 
-  DollarSign, 
-  TrendingDown, 
   Shield, 
   CheckCircle2, 
   XCircle,
@@ -69,14 +66,12 @@ const emotionOptions: EmotionType[] = [
 
 export const RoutinesPage = () => {
   const {
-    routines,
     dailyExecutions,
     loadRoutines,
     loadDailyExecutions,
     getRoutine,
     getTodayExecution,
     addRoutineItem,
-    toggleRoutineItem,
     deleteRoutineItem,
     updateRoutineItem,
     markBlockComplete,
@@ -131,7 +126,7 @@ export const RoutinesPage = () => {
   const currentCapital = settings.currentCapital || settings.accountSize;
   const initialCapital = settings.initialCapital || settings.accountSize;
   
-  const { current: currentDrawdown, currentPercent: currentDrawdownPercent } = calculateDrawdown(trades, initialCapital);
+  const { currentPercent: currentDrawdownPercent } = calculateDrawdown(trades, initialCapital);
   const { amount: dailyLoss, percent: dailyLossPercent } = calculateDailyLoss(trades, currentCapital);
   
   const tradingStatus = useMemo(() => 

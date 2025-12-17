@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import type { Trade, Settings } from '@/types/Trading';
+import type { Trade, Settings, TradingRules } from '@/types/Trading';
 import { Shield, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -10,7 +10,7 @@ interface ActiveRulesProps {
 }
 
 export const ActiveRules: React.FC<ActiveRulesProps> = ({ trades, settings }) => {
-  const rules = settings.advanced?.tradingRules || {};
+  const rules: TradingRules | undefined = settings.advanced?.tradingRules;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -37,7 +37,7 @@ export const ActiveRules: React.FC<ActiveRulesProps> = ({ trades, settings }) =>
   }> = [];
 
   // Máximo de trades diarios
-  if (rules.maxTradesPerDay) {
+  if (rules?.maxTradesPerDay) {
     activeRules.push({
       label: `Máx ${rules.maxTradesPerDay} trades diarios`,
       current: todayTrades.length,
@@ -47,7 +47,7 @@ export const ActiveRules: React.FC<ActiveRulesProps> = ({ trades, settings }) =>
   }
 
   // Máximo de trades semanales
-  if (rules.maxTradesPerWeek) {
+  if (rules?.maxTradesPerWeek) {
     activeRules.push({
       label: `Máx ${rules.maxTradesPerWeek} trades semanales`,
       current: weekTrades.length,
@@ -62,7 +62,7 @@ export const ActiveRules: React.FC<ActiveRulesProps> = ({ trades, settings }) =>
   const currentCapital = settings.currentCapital || settings.accountSize;
   const dailyLossPercent = currentCapital > 0 ? (Math.abs(Math.min(0, todayPnL)) / currentCapital) * 100 : 0;
   
-  if (rules.dailyLossLimit) {
+  if (rules?.dailyLossLimit) {
     activeRules.push({
       label: `Límite pérdida diaria: ${rules.dailyLossLimit}%`,
       current: dailyLossPercent,
@@ -72,7 +72,7 @@ export const ActiveRules: React.FC<ActiveRulesProps> = ({ trades, settings }) =>
   }
 
   // Objetivo de ganancia diaria
-  if (rules.dailyProfitTarget) {
+  if (rules?.dailyProfitTarget) {
     activeRules.push({
       label: `Objetivo ganancia diaria: ${rules.dailyProfitTarget}%`,
       current: currentCapital > 0 ? (Math.max(0, todayPnL) / currentCapital) * 100 : 0,

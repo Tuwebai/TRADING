@@ -16,7 +16,7 @@ import { useSetupStore } from '@/store/setupStore';
 import { checkTradingRules } from '@/lib/tradingRules';
 import type { RuleViolation } from '@/lib/tradingRules';
 import type { TradeFormData, PositionType, Trade, TradeJournal, TradingSession } from '@/types/Trading';
-import { isForexPair } from '@/lib/forexCalculations';
+import { isForexPair, calculateSwap } from '@/lib/forexCalculations';
 
 interface TradeFormProps {
   trade?: Trade | null;

@@ -288,9 +288,9 @@ export function simulateTradeImpact(
   }
 
   // Check if would exceed daily risk limit
-  if (riskManagement?.maxRiskDaily !== null && afterTodayRisk.percent > riskManagement.maxRiskDaily) {
+  if (riskManagement?.maxRiskDaily !== null && riskManagement && afterTodayRisk.percent > riskManagement.maxRiskDaily) {
     finalStatus = 'blocked';
-  } else if (riskManagement?.maxRiskDaily !== null && afterTodayRisk.percent > riskManagement.maxRiskDaily * 0.8) {
+  } else if (riskManagement?.maxRiskDaily !== null && riskManagement && afterTodayRisk.percent > riskManagement.maxRiskDaily * 0.8) {
     if (finalStatus === 'ok') finalStatus = 'warning';
   }
 
@@ -366,7 +366,7 @@ export function checkTradeCalculation(
   // Check daily risk
   const todayRisk = calculateTodayRisk(trades, settings);
   const afterRisk = todayRisk.percent + calculation.riskPercentage;
-  if (riskManagement?.maxRiskDaily !== null && afterRisk > riskManagement.maxRiskDaily) {
+  if (riskManagement?.maxRiskDaily !== null && riskManagement && afterRisk > riskManagement.maxRiskDaily) {
     violations.push({
       rule: 'maxRiskDaily',
       severity: 'critical',
@@ -378,7 +378,7 @@ export function checkTradeCalculation(
   let suggestedSize: number | undefined;
   if (violations.some(v => v.severity === 'critical')) {
     // Suggest size that respects max risk per trade
-    if (riskManagement?.maxRiskPerTrade !== null && calculation.riskPercentage > riskManagement.maxRiskPerTrade) {
+    if (riskManagement?.maxRiskPerTrade !== null && riskManagement && calculation.riskPercentage > riskManagement.maxRiskPerTrade) {
       const maxRiskAmount = (currentCapital * riskManagement.maxRiskPerTrade) / 100;
       const priceDiff = Math.abs(calculation.entryPrice - calculation.stopLoss);
       if (priceDiff > 0) {

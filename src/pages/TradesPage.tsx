@@ -19,6 +19,7 @@ import { useTradeStore } from '@/store/tradeStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTemplateStore } from '@/store/templateStore';
 import { checkTradingRules, isBlocked, blockUser } from '@/lib/tradingRules';
+import { isPreTradeComplete } from '@/lib/routineDiscipline';
 import { useEvaluatedTrades } from '@/hooks/useTradeRuleEvaluation';
 import { initializeBackupSystem } from '@/lib/backup';
 import { useCommonShortcuts } from '@/hooks/useKeyboardShortcuts';

@@ -3,7 +3,7 @@
  * Determina si el usuario está en condiciones de operar
  */
 
-import type { Trade, Settings } from '@/types/Trading';
+import type { Trade, Settings, TradingRules } from '@/types/Trading';
 import { getRiskMetrics, getRiskWarnings, getRiskLevel } from './risk';
 import { generateEquityCurve, calculateMaxDrawdown } from './calculations';
 import { calculateHistoricalAvgTradesPerDay } from './proactiveInsights';
@@ -30,7 +30,7 @@ export interface TradingStatusInfo {
  */
 function detectRuleViolations(trades: Trade[], settings: Settings): string[] {
   const violations: string[] = [];
-  const rules = settings.advanced?.tradingRules || {};
+  const rules: TradingRules | undefined = settings.advanced?.tradingRules;
 
   // Trades hoy
   const today = new Date();
@@ -42,12 +42,12 @@ function detectRuleViolations(trades: Trade[], settings: Settings): string[] {
   });
 
   // Máximo de trades diarios
-  if (rules.maxTradesPerDay && todayTrades.length >= rules.maxTradesPerDay) {
+  if (rules?.maxTradesPerDay && todayTrades.length >= rules.maxTradesPerDay) {
     violations.push(`Máx ${rules.maxTradesPerDay} trades diarios`);
   }
 
   // Máximo de trades semanales
-  if (rules.maxTradesPerWeek) {
+  if (rules?.maxTradesPerWeek) {
     const weekStart = new Date(today);
     weekStart.setDate(today.getDate() - today.getDay()); // Domingo
     const weekTrades = trades.filter(t => {
@@ -60,7 +60,7 @@ function detectRuleViolations(trades: Trade[], settings: Settings): string[] {
   }
 
   // Horarios permitidos
-  if (rules.allowedTradingHours?.enabled) {
+  if (rules?.allowedTradingHours?.enabled) {
     const now = new Date();
     const currentHour = now.getHours();
     const startHour = rules.allowedTradingHours.startHour;
@@ -109,7 +109,7 @@ export function calculateTradingStatus(
   // Calcular drawdown
   const initialCapital = settings.currentCapital || settings.initialCapital || settings.accountSize;
   const equityCurve = generateEquityCurve(trades, initialCapital);
-  const drawdown = calculateMaxDrawdown(equityCurve);
+  calculateMaxDrawdown(equityCurve);
   const lastPoint = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1] : null;
   const currentDrawdownPercent = lastPoint && lastPoint.peak > 0
     ? ((lastPoint.peak - lastPoint.equity) / lastPoint.peak) * 100

@@ -86,7 +86,7 @@ export interface Trade {
   // Trading-specific fields
   commission?: number; // Commission paid
   spread?: number; // Spread cost
-  swap?: number; // Swap/rollover cost
+  swap?: number | null; // Swap/rollover cost
   swapRate?: number; // Swap rate in pips (for calculation)
   swapType?: 'long' | 'short' | 'both'; // Which positions pay swap
   session?: TradingSession; // Trading session

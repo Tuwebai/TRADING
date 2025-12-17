@@ -1,8 +1,8 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { formatCurrency, formatPercentage } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import type { Trade, Settings } from '@/types/Trading';
-import { Calendar, TrendingUp, TrendingDown, AlertTriangle, Smile } from 'lucide-react';
+import { Calendar, Smile } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DailySummaryProps {
@@ -39,8 +39,8 @@ export const DailySummary: React.FC<DailySummaryProps> = ({ trades, settings }) 
 
   // Estado emocional promedio (si existe)
   const emotions = todayTrades
-    .filter(t => t.emotion)
-    .map(t => t.emotion!);
+    .filter(t => t.journal?.emotion)
+    .map(t => t.journal.emotion!);
   
   const emotionCounts = emotions.reduce((acc, emotion) => {
     acc[emotion] = (acc[emotion] || 0) + 1;

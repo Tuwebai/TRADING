@@ -13,7 +13,7 @@ import { ActiveRules } from '@/components/dashboard/ActiveRules';
 import { PriorityInsight } from '@/components/dashboard/PriorityInsight';
 import { TradeDetailsPanel } from '@/components/trades/TradeDetailsPanel';
 import { Link } from 'react-router-dom';
-import { TrendingUp, TrendingDown, Activity, Plus, Shield, AlertTriangle, FileText } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Plus, Shield, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { SkeletonStatCard } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,6 @@ export const DashboardPage = () => {
   const { trades, loadTrades, isLoading, deleteTrade, duplicateTrade } = useTradeStore();
   const { settings, loadSettings } = useSettingsStore();
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
-  const [dismissedWarning, setDismissedWarning] = useState(false);
 
   useEffect(() => {
     loadTrades();
@@ -288,8 +287,8 @@ export const DashboardPage = () => {
                     )}>
                       {card.value}
                     </div>
-                    {card.description && (
-                      <p className="text-xs text-muted-foreground mt-1">{card.description}</p>
+                    {(card as any).description && (
+                      <p className="text-xs text-muted-foreground mt-1">{(card as any).description}</p>
                     )}
                     {card.context && (
                       <p className={cn(
