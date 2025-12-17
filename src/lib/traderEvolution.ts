@@ -130,7 +130,7 @@ function calculateTraderLevel(progress: TraderEvolution['progress']): TraderLeve
  */
 function determineTraderPhase(
   level: TraderLevel,
-  metrics: TraderEvolution['metrics']
+  _metrics: TraderEvolution['metrics']
 ): TraderPhase {
   if (level === 1) return 'exploration';
   if (level === 2) return 'consolidation';

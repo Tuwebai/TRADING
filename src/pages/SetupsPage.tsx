@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/Label';
 import { Textarea } from '@/components/ui/Textarea';
 import { Modal } from '@/components/ui/Modal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Plus, Edit, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import { useSetupStore } from '@/store/setupStore';
 import { useTradeStore } from '@/store/tradeStore';
 import { formatCurrency } from '@/lib/utils';

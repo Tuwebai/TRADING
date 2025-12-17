@@ -4,9 +4,7 @@
  */
 
 import type { Trade, Settings } from '@/types/Trading';
-import { calculateAnalytics } from './calculations';
 import { calculateDrawdown } from './risk';
-import { getTopAssets } from './insights';
 
 export interface AssetStatistics {
   asset: string;

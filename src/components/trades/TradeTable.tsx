@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Edit, Trash2, X, TrendingUp, TrendingDown, Copy, History, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, X, TrendingUp, TrendingDown, Copy, History } from 'lucide-react';
 import type { Trade } from '@/types/Trading';
 import { formatPrice, formatCurrency, formatDate } from '@/lib/utils';
 import { useSettingsStore } from '@/store/settingsStore';

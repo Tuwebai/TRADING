@@ -5,7 +5,7 @@
 
 import type { Trade, Settings } from '@/types/Trading';
 import { calculateAnalytics, generateEquityCurve, calculateMaxDrawdown } from './calculations';
-import { getRiskMetrics, getRiskWarnings } from './risk';
+import { getRiskMetrics } from './risk';
 import { getTradesByMonth } from './calendarStats';
 
 export type InsightSeverity = 'critical' | 'important' | 'positive';

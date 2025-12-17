@@ -353,12 +353,13 @@ export function checkTradeCalculation(
   const currentCapital = settings.currentCapital || settings.accountSize;
 
   // Check max risk per trade
-  if (riskManagement?.maxRiskPerTrade !== null) {
-    if (calculation.riskPercentage > riskManagement.maxRiskPerTrade) {
+  if (riskManagement?.maxRiskPerTrade !== null && riskManagement?.maxRiskPerTrade !== undefined) {
+    const maxRisk = riskManagement.maxRiskPerTrade;
+    if (calculation.riskPercentage > maxRisk) {
       violations.push({
         rule: 'maxRiskPerTrade',
         severity: 'critical',
-        message: `Riesgo por trade (${calculation.riskPercentage.toFixed(2)}%) excede el límite (${riskManagement.maxRiskPerTrade}%)`,
+        message: `Riesgo por trade (${calculation.riskPercentage.toFixed(2)}%) excede el límite (${maxRisk}%)`,
       });
     }
   }
@@ -378,11 +379,14 @@ export function checkTradeCalculation(
   let suggestedSize: number | undefined;
   if (violations.some(v => v.severity === 'critical')) {
     // Suggest size that respects max risk per trade
-    if (riskManagement?.maxRiskPerTrade !== null && riskManagement && calculation.riskPercentage > riskManagement.maxRiskPerTrade) {
-      const maxRiskAmount = (currentCapital * riskManagement.maxRiskPerTrade) / 100;
-      const priceDiff = Math.abs(calculation.entryPrice - calculation.stopLoss);
-      if (priceDiff > 0) {
-        suggestedSize = maxRiskAmount / priceDiff;
+    if (riskManagement?.maxRiskPerTrade !== null && riskManagement?.maxRiskPerTrade !== undefined) {
+      const maxRisk = riskManagement.maxRiskPerTrade;
+      if (calculation.riskPercentage > maxRisk) {
+        const maxRiskAmount = (currentCapital * maxRisk) / 100;
+        const priceDiff = Math.abs(calculation.entryPrice - calculation.stopLoss);
+        if (priceDiff > 0) {
+          suggestedSize = maxRiskAmount / priceDiff;
+        }
       }
     }
   }

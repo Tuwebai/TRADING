@@ -752,7 +752,7 @@ export const CapitalManagementPage = () => {
 
                 {/* Validación de reglas */}
                 {calculation && (() => {
-                  checkTradeCalculation(
+                  const validation = checkTradeCalculation(
                     {
                       positionSize: calculation.positionSize,
                       riskAmount: calculation.riskAmount,
@@ -769,7 +769,7 @@ export const CapitalManagementPage = () => {
                       <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
                         <div className="font-semibold text-destructive mb-2">⚠️ Violaciones de Reglas Detectadas</div>
                         <ul className="space-y-1 mb-3">
-                          {validation.violations.map((v, idx) => (
+                          {validation.violations.map((v: { rule: string; severity: 'critical' | 'minor'; message: string }, idx: number) => (
                             <li key={idx} className="text-sm flex items-start gap-2">
                               <XCircle className="h-4 w-4 mt-0.5 text-destructive" />
                               <span>{v.message}</span>

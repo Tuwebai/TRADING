@@ -37,17 +37,17 @@ export const DailySummary: React.FC<DailySummaryProps> = ({ trades, settings }) 
     return sum + (riskAmount / currentCapital) * 100;
   }, 0);
 
-  // Estado emocional promedio (si existe)
+  // Estado emocional promedio (si existe) - busca en preTrade, duringTrade o postTrade
   const emotions = todayTrades
-    .filter(t => t.journal?.emotion)
-    .map(t => t.journal.emotion!);
+    .map(t => t.journal?.preTrade?.emotion || t.journal?.duringTrade?.emotion || t.journal?.postTrade?.emotion)
+    .filter((emotion): emotion is string => emotion !== null && emotion !== undefined);
   
   const emotionCounts = emotions.reduce((acc, emotion) => {
     acc[emotion] = (acc[emotion] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  const dominantEmotion = Object.entries(emotionCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const dominantEmotion = Object.entries(emotionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] as string | undefined;
 
   const emotionLabels: Record<string, string> = {
     confident: 'Confianza',

@@ -127,7 +127,7 @@ export const RoutinesPage = () => {
   const initialCapital = settings.initialCapital || settings.accountSize;
   
   const { currentPercent: currentDrawdownPercent } = calculateDrawdown(trades, initialCapital);
-  const { amount: dailyLoss, percent: dailyLossPercent } = calculateDailyLoss(trades, currentCapital);
+  const { percent: dailyLossPercent } = calculateDailyLoss(trades, currentCapital);
   
   const tradingStatus = useMemo(() => 
     calculateTradingStatus(trades, settings),

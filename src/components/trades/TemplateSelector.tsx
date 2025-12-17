@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Modal } from '@/components/ui/Modal';
-import { Save, FileText, Trash2, X } from 'lucide-react';
+import { Save, FileText, Trash2 } from 'lucide-react';
 import { useTemplateStore } from '@/store/templateStore';
 import type { TradeFormData } from '@/types/Trading';
 

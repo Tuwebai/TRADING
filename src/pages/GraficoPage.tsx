@@ -8,8 +8,6 @@ import { motion } from 'framer-motion';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTradeStore } from '@/store/tradeStore';
 import { 
-  TrendingUp, 
-  TrendingDown, 
   AlertTriangle, 
   CheckCircle2, 
   XCircle,
@@ -17,8 +15,6 @@ import {
   Calculator,
   Send,
   Plus,
-  Clock,
-  DollarSign,
   Target,
   Activity,
   Shield

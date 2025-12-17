@@ -16,8 +16,6 @@ import {
   Lightbulb,
   LogOut,
   Layers,
-  AlertCircle,
-  Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';

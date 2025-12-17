@@ -4,7 +4,6 @@
  */
 
 import type { Trade, Settings, EvaluatedRule, ViolatedRule } from '@/types/Trading';
-import { checkTradingRules } from './tradingRules';
 import { getRiskMetrics } from './risk';
 
 export type RuleStatus = 'clean' | 'minor-violation' | 'critical-violation';
@@ -155,7 +154,7 @@ export function evaluateTradeRules(
   }
 
   // Rule 5: Risk per trade
-  const riskMetrics = getRiskMetrics(allTrades, settings);
+  getRiskMetrics(allTrades, settings);
   const currentCapital = settings.currentCapital || settings.accountSize;
   
   if (trade.stopLoss) {

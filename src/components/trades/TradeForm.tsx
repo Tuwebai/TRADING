@@ -104,7 +104,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, initialFormData, on
         journal: trade.journal || defaultJournal,
         commission: trade.commission,
         spread: trade.spread,
-        swap: trade.swap,
+        swap: trade.swap ?? undefined,
         swapRate: trade.swapRate,
         swapType: trade.swapType,
         session: trade.session,

@@ -4,7 +4,6 @@
  */
 
 import type { Trade } from '@/types/Trading';
-import { calculatePNL } from './calculations';
 
 /**
  * Calculate trade duration in hours and days

@@ -26,7 +26,7 @@ export const TradeContextualInsights: React.FC<TradeContextualInsightsProps> = (
 
   const insights: ContextualInsight[] = [];
   const closedTrades = trades.filter(t => t.status === 'closed');
-  const analytics = calculateAnalytics(closedTrades);
+  calculateAnalytics(closedTrades);
 
   // Insight 1: Overtrading detection
   const historicalAvg = calculateHistoricalAvgTradesPerDay(closedTrades);
@@ -202,7 +202,6 @@ export const TradeContextualInsights: React.FC<TradeContextualInsightsProps> = (
             };
 
             const config = getConfig();
-            const Icon = config.icon;
 
             return (
               <div

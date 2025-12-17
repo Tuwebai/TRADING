@@ -140,7 +140,6 @@ export function compareProfitFactor(trades: Trade[]): MetricComparison {
   }
 
   // Para profit factor, comparamos con el promedio de los últimos 3 meses vs anteriores
-  const now = new Date();
   const closedTrades = trades.filter(t => t.status === 'closed').sort((a, b) => 
     new Date(b.exitDate || b.entryDate).getTime() - new Date(a.exitDate || a.entryDate).getTime()
   );

@@ -39,7 +39,6 @@ export const TradesPage = () => {
     duplicateTrade,
     setFilters,
     clearFilters,
-    getFilteredTrades,
     isLoading,
     selectedTradeId,
     setSelectedTrade,

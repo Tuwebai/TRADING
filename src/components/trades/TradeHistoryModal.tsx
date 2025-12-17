@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { formatDate, formatTime } from '@/lib/utils';
-import type { Trade, TradeChange } from '@/types/Trading';
+import type { Trade } from '@/types/Trading';
 
 interface TradeHistoryModalProps {
   isOpen: boolean;

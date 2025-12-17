@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Edit, Trash2, Copy, TrendingUp, TrendingDown, Clock, DollarSign, Percent, AlertCircle, CheckCircle2, XCircle, Shield } from 'lucide-react';
+import { X, Edit, Trash2, Copy, TrendingUp, TrendingDown, Clock, Percent, AlertCircle, CheckCircle2, XCircle, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useTradeStore } from '@/store/tradeStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useSetupStore } from '@/store/setupStore';
-import { formatPrice, formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
+import { formatPrice, formatCurrency, formatDateTime } from '@/lib/utils';
 import { calculateTradeDuration, calculateTradeRisk, calculateAccountPercentage } from '@/lib/tradeMetrics';
 import { isForexPair } from '@/lib/forexCalculations';
-import { getTradeRuleStatus } from '@/lib/tradeRuleEvaluation';
 import type { Trade } from '@/types/Trading';
 import { cn } from '@/lib/utils';
 

@@ -1,9 +1,7 @@
 import React from 'react';
-import { AlertCircle, X, Pause, LogOut, Settings } from 'lucide-react';
+import { AlertCircle, X, Pause, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSettingsStore } from '@/store/settingsStore';
-import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 interface RiskWarningBannerProps {

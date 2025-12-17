@@ -91,9 +91,9 @@ export interface Trade {
   swapType?: 'long' | 'short' | 'both'; // Which positions pay swap
   session?: TradingSession; // Trading session
   setupId?: string; // Reference to setup used
-  pips?: number; // Pips gained/lost (for forex)
-  riskPips?: number; // Risk in pips
-  rewardPips?: number; // Reward in pips
+  pips?: number | null; // Pips gained/lost (for forex)
+  riskPips?: number | null; // Risk in pips
+  rewardPips?: number | null; // Reward in pips
   // Rule evaluation fields
   evaluatedRules?: EvaluatedRule[]; // All rules evaluated for this trade
   violatedRules?: ViolatedRule[]; // Rules that were violated
