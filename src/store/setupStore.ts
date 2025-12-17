@@ -88,30 +88,47 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   },
 
   updateSetupStats: (id: string, trades: Trade[]) => {
+    const setups = get().setups;
+    const setup = setups.find(s => s.id === id);
+    if (!setup) return;
+
     const setupTrades = trades.filter(t => t.setupId === id && t.status === 'closed');
     
+    let newStats;
     if (setupTrades.length === 0) {
-      get().updateSetup(id, {
-        stats: {
-          totalTrades: 0,
-          winRate: 0,
-          avgPnl: 0,
-          profitFactor: 0,
-        },
-      });
-      return;
-    }
-
-    const analytics = calculateAnalytics(setupTrades);
-    
-    get().updateSetup(id, {
-      stats: {
+      newStats = {
+        totalTrades: 0,
+        winRate: 0,
+        avgPnl: 0,
+        profitFactor: 0,
+      };
+    } else {
+      const analytics = calculateAnalytics(setupTrades);
+      newStats = {
         totalTrades: analytics.totalTrades,
         winRate: analytics.winRate,
         avgPnl: analytics.averagePnl,
         profitFactor: analytics.profitFactor,
-      },
-    });
+      };
+    }
+
+    // Solo actualizar si los stats realmente cambiaron
+    const currentStats = setup.stats || {
+      totalTrades: 0,
+      winRate: 0,
+      avgPnl: 0,
+      profitFactor: 0,
+    };
+
+    const statsChanged = 
+      currentStats.totalTrades !== newStats.totalTrades ||
+      Math.abs(currentStats.winRate - newStats.winRate) > 0.01 ||
+      Math.abs(currentStats.avgPnl - newStats.avgPnl) > 0.01 ||
+      Math.abs(currentStats.profitFactor - newStats.profitFactor) > 0.01;
+
+    if (statsChanged) {
+      get().updateSetup(id, { stats: newStats });
+    }
   },
 }));
 

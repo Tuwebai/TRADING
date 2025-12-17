@@ -228,7 +228,7 @@ export const AdvancedSettingsComponent: React.FC<AdvancedSettingsProps> = ({
               <div className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
                 <CardTitle>Configuración Avanzada</CardTitle>
-            </div>
+              </div>
             </div>
             <CardDescription>
             Sistema completo de configuración persistente que gobierna toda la plataforma

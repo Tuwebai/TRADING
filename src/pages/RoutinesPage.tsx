@@ -28,8 +28,7 @@ import type { RoutineType, RoutineBlockStatus, EmotionType } from '@/types/Tradi
 import { getCurrentSession } from '@/lib/assetStats';
 import { calculateDrawdown, calculateDailyLoss } from '@/lib/risk';
 import { calculateTradingStatus } from '@/lib/tradingStatus';
-import { isPreTradeComplete } from '@/lib/routineDiscipline';
-import { calculateDisciplineMetrics } from '@/lib/routineDiscipline';
+import { isPreTradeComplete, calculateDisciplineMetrics, getTodayDate } from '@/lib/routineDiscipline';
 import { isBlocked } from '@/lib/tradingRules';
 import { motion } from 'framer-motion';
 
@@ -116,8 +115,16 @@ export const RoutinesPage = () => {
     loadDailyExecutions();
   }, [loadRoutines, loadDailyExecutions]);
 
-  // Get today's execution
-  const todayExecution = useMemo(() => getTodayExecution(), [getTodayExecution]);
+  // Get today's execution from store state directly, avoiding state updates during render
+  const today = getTodayDate();
+  const todayExecution = useMemo(() => {
+    const existing = dailyExecutions.find(exec => exec.date === today);
+    if (existing) {
+      return existing;
+    }
+    // If not in store, use the library function directly to get it without updating store
+    return getTodayExecution();
+  }, [dailyExecutions, today, getTodayExecution]);
 
   // Calculate context data
   const currentSession = getCurrentSession();
@@ -144,8 +151,8 @@ export const RoutinesPage = () => {
     [dailyExecutions]
   );
 
-  // Get today's date
-  const today = new Date().toLocaleDateString('es-ES', {
+  // Get today's date formatted for display
+  const todayFormatted = new Date().toLocaleDateString('es-ES', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -267,7 +274,7 @@ export const RoutinesPage = () => {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="p-3 border rounded-lg">
               <div className="text-sm text-muted-foreground mb-1">Fecha</div>
-              <div className="font-semibold">{today}</div>
+              <div className="font-semibold">{todayFormatted}</div>
             </div>
             
             <div className="p-3 border rounded-lg">

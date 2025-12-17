@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Plus, Trash2, Edit2, Check } from 'lucide-react';
-import type { Routine, RoutineItem, RoutineType } from '@/types/Trading';
+import type { Routine, RoutineItem, RoutineType, DailyRoutineExecution } from '@/types/Trading';
 import { useRoutineStore } from '@/store/routineStore';
+import { getTodayDate, getTodayExecution as getTodayExecutionLib } from '@/lib/routineDiscipline';
 
 interface RoutineChecklistProps {
   routine: Routine | null;
@@ -61,8 +62,30 @@ export const RoutineChecklist: React.FC<RoutineChecklistProps> = ({
     setEditText('');
   };
 
-  const { getTodayExecution } = useRoutineStore();
-  const todayExecution = getTodayExecution();
+  const { dailyExecutions, getTodayExecution } = useRoutineStore();
+  const today = getTodayDate();
+  
+  // Get today's execution from store state directly, avoiding state updates during render
+  const todayExecution = useMemo(() => {
+    const existing = dailyExecutions.find(exec => exec.date === today);
+    if (existing) {
+      return existing;
+    }
+    // If not in store, use the library function directly to get it without updating store
+    // This should only happen on first render
+    return getTodayExecutionLib();
+  }, [dailyExecutions, today]);
+  
+  // Ensure execution is synced to store on mount (only once)
+  useEffect(() => {
+    const existing = dailyExecutions.find(exec => exec.date === today);
+    if (!existing) {
+      // Sync to store only once on mount
+      getTodayExecution();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+  
   const block = todayExecution.blocks[type];
   
   const items = routine?.items || [];

@@ -86,15 +86,22 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
 
   getTodayExecution: () => {
     const execution = getTodayExecution();
-    // Sync with store
+    // Sync with store only if it's different
     const executions = get().dailyExecutions;
     const existingIndex = executions.findIndex(exec => exec.date === execution.date);
+    
     if (existingIndex === -1) {
+      // Only update if it doesn't exist
       set({ dailyExecutions: [...executions, execution] });
     } else {
-      const updated = [...executions];
-      updated[existingIndex] = execution;
-      set({ dailyExecutions: updated });
+      // Only update if the execution actually changed
+      const existing = executions[existingIndex];
+      const hasChanged = JSON.stringify(existing) !== JSON.stringify(execution);
+      if (hasChanged) {
+        const updated = [...executions];
+        updated[existingIndex] = execution;
+        set({ dailyExecutions: updated });
+      }
     }
     return execution;
   },

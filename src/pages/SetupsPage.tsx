@@ -36,12 +36,14 @@ export const SetupsPage = () => {
     loadTrades();
   }, [loadSetups, loadTrades]);
 
-  // Update stats for all setups
+  // Update stats for all setups when trades change
   useEffect(() => {
+    const { updateSetupStats } = useSetupStore.getState();
     setups.forEach(setup => {
-      useSetupStore.getState().updateSetupStats(setup.id, trades);
+      updateSetupStats(setup.id, trades);
     });
-  }, [trades, setups]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trades]);
 
   const handleAdd = () => {
     setEditingSetup(null);
