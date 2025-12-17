@@ -479,6 +479,27 @@ export type GoalPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type GoalType = 'pnl' | 'winRate' | 'numTrades';
 
 /**
+ * Goal constraint types - how the goal affects UI/behavior
+ */
+export type GoalConstraintType = 
+  | 'none' // No constraint
+  | 'session' // Constrains trading to specific session (e.g., 'new-york')
+  | 'hours' // Constrains trading to specific hours
+  | 'max-trades' // Blocks trading after max trades reached
+  | 'max-loss' // Blocks trading after max loss reached
+  | 'custom'; // Custom constraint logic
+
+/**
+ * Goal consequences when binding goal is violated
+ */
+export interface GoalConsequences {
+  cooldownHours?: number; // Hours of cooldown after violation
+  reduceRiskPercent?: number; // Reduce risk per trade by this percentage
+  blockPartial?: boolean; // Partial system block (disable trade creation)
+  blockFull?: boolean; // Full system block
+}
+
+/**
  * Trading goal
  */
 export interface TradingGoal {
@@ -492,4 +513,23 @@ export interface TradingGoal {
   completed: boolean;
   createdAt: string;
   updatedAt: string;
+  
+  // New advanced features
+  isPrimary?: boolean; // True if this is the "Foco del Día" (focus goal)
+  isBinding?: boolean; // True if this goal has contractual consequences
+  constraintType?: GoalConstraintType; // How this goal affects UI
+  constraintConfig?: {
+    session?: 'asian' | 'london' | 'new-york' | 'overlap';
+    startHour?: number;
+    endHour?: number;
+    maxValue?: number;
+    [key: string]: any; // Allow custom constraint config
+  };
+  consequences?: GoalConsequences; // Consequences if binding goal is violated
+  
+  // Tracking
+  failedAt?: string; // ISO date string - when goal failed
+  lastFailedAt?: string; // ISO date string - last time goal failed
+  failureCount?: number; // Number of times this goal has failed
+  generatedInsightIds?: string[]; // IDs of insights generated from this goal
 }

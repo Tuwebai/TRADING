@@ -7,7 +7,6 @@ import type { Trade, Settings } from '@/types/Trading';
 import { calculateAnalytics, generateEquityCurve, calculateMaxDrawdown } from './calculations';
 import { getRiskMetrics } from './risk';
 import { getPriorityInsights } from './proactiveInsights';
-import { getTradesByMonth } from './calendarStats';
 
 export type TraderLevel = 1 | 2 | 3 | 4;
 export type TraderPhase = 'exploration' | 'consolidation' | 'consistency' | 'optimization';

@@ -54,8 +54,6 @@ export function calculateTradePips(trade: Trade): {
     return { totalPips: null, riskPips: null, rewardPips: null };
   }
 
-  const pipValue = getPipValue(trade.asset);
-  
   let totalPips: number | null = null;
   if (trade.exitPrice) {
     const priceDiff = Math.abs(trade.exitPrice - trade.entryPrice);

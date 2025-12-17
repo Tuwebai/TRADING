@@ -49,11 +49,24 @@ interface GoalsStore {
   
   // Actions
   loadGoals: () => void;
-  addGoal: (period: GoalPeriod, type: GoalType, target: number) => void;
+  addGoal: (
+    period: GoalPeriod,
+    type: GoalType,
+    target: number,
+    options?: {
+      isPrimary?: boolean;
+      isBinding?: boolean;
+      constraintType?: TradingGoal['constraintType'];
+      constraintConfig?: TradingGoal['constraintConfig'];
+      consequences?: TradingGoal['consequences'];
+    }
+  ) => void;
   updateGoal: (id: string, updates: Partial<TradingGoal>) => void;
   deleteGoal: (id: string) => void;
   getGoalsByPeriod: (period: GoalPeriod) => TradingGoal[];
   updateGoalProgress: (goalId: string, current: number) => void;
+  setPrimaryGoal: (goalId: string | null) => void;
+  getPrimaryGoal: () => TradingGoal | null;
 }
 
 export const useGoalsStore = create<GoalsStore>((set, get) => ({
@@ -73,9 +86,30 @@ export const useGoalsStore = create<GoalsStore>((set, get) => ({
     }
   },
 
-  addGoal: (period: GoalPeriod, type: GoalType, target: number) => {
+  addGoal: (
+    period: GoalPeriod,
+    type: GoalType,
+    target: number,
+    options?: {
+      isPrimary?: boolean;
+      isBinding?: boolean;
+      constraintType?: TradingGoal['constraintType'];
+      constraintConfig?: TradingGoal['constraintConfig'];
+      consequences?: TradingGoal['consequences'];
+    }
+  ) => {
     const now = new Date().toISOString();
     const dateRange = getDateRange(period);
+    
+    // If setting as primary, unset other primary goals
+    const goals = get().goals;
+    if (options?.isPrimary) {
+      goals.forEach(g => {
+        if (g.isPrimary) {
+          g.isPrimary = false;
+        }
+      });
+    }
     
     const newGoal: TradingGoal = {
       id: generateId(),
@@ -88,11 +122,31 @@ export const useGoalsStore = create<GoalsStore>((set, get) => ({
       completed: false,
       createdAt: now,
       updatedAt: now,
+      isPrimary: options?.isPrimary ?? false,
+      isBinding: options?.isBinding ?? false,
+      constraintType: options?.constraintType ?? 'none',
+      constraintConfig: options?.constraintConfig,
+      consequences: options?.consequences,
+      failureCount: 0,
+      generatedInsightIds: [],
     };
 
-    const goals = [...get().goals, newGoal];
+    const updatedGoals = [...goals, newGoal];
+    set({ goals: updatedGoals });
+    localStorage.setItem('trading_log_goals', JSON.stringify(updatedGoals));
+  },
+
+  setPrimaryGoal: (goalId: string | null) => {
+    const goals = get().goals.map(goal => ({
+      ...goal,
+      isPrimary: goal.id === goalId,
+    }));
     set({ goals });
     localStorage.setItem('trading_log_goals', JSON.stringify(goals));
+  },
+
+  getPrimaryGoal: () => {
+    return get().goals.find(g => g.isPrimary) || null;
   },
 
   updateGoal: (id: string, updates: Partial<TradingGoal>) => {

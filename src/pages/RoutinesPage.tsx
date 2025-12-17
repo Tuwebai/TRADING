@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import type { RoutineType, RoutineBlockStatus, EmotionType } from '@/types/Trading';
 import { getCurrentSession } from '@/lib/assetStats';
-import { calculateDrawdown, calculateDailyLoss } from '@/lib/risk';
+import { calculateDrawdown } from '@/lib/risk';
 import { calculateTradingStatus } from '@/lib/tradingStatus';
 import { isPreTradeComplete, calculateDisciplineMetrics, getTodayDate } from '@/lib/routineDiscipline';
 import { isBlocked } from '@/lib/tradingRules';
@@ -127,7 +127,6 @@ export const RoutinesPage = () => {
   const initialCapital = settings.initialCapital || settings.accountSize;
   
   const { currentPercent: currentDrawdownPercent } = calculateDrawdown(trades, initialCapital);
-  const { percent: dailyLossPercent } = calculateDailyLoss(trades, currentCapital);
   
   const tradingStatus = useMemo(() => 
     calculateTradingStatus(trades, settings),

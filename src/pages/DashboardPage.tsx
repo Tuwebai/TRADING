@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useTradeStore } from '@/store/tradeStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useGoalsStore } from '@/store/goalsStore';
 import { calculateAnalytics, generateEquityCurve, calculateMaxDrawdown } from '@/lib/calculations';
 import { formatPrice, formatCurrency, formatPercentage } from '@/lib/utils';
 import { getRiskMetrics } from '@/lib/risk';
@@ -13,22 +14,29 @@ import { ActiveRules } from '@/components/dashboard/ActiveRules';
 import { PriorityInsight } from '@/components/dashboard/PriorityInsight';
 import { TradeDetailsPanel } from '@/components/trades/TradeDetailsPanel';
 import { Link } from 'react-router-dom';
-import { TrendingUp, TrendingDown, Activity, Plus, Shield, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Plus, Shield, AlertTriangle, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { SkeletonStatCard } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
 import { compareWinRate, compareAveragePnL, compareProfitFactor } from '@/lib/metricComparisons';
+import { shouldBlockTradingDueToGoals } from '@/lib/goalConstraints';
 import type { Trade } from '@/types/Trading';
 
 export const DashboardPage = () => {
   const { trades, loadTrades, isLoading, deleteTrade, duplicateTrade } = useTradeStore();
   const { settings, loadSettings } = useSettingsStore();
+  const { goals, loadGoals, getPrimaryGoal } = useGoalsStore();
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
 
   useEffect(() => {
     loadTrades();
     loadSettings();
-  }, [loadTrades, loadSettings]);
+    loadGoals();
+  }, [loadTrades, loadSettings, loadGoals]);
+
+  // Get primary goal and check if trading should be blocked
+  const primaryGoal = useMemo(() => getPrimaryGoal(), [goals, getPrimaryGoal]);
+  const goalBlocking = useMemo(() => shouldBlockTradingDueToGoals(goals, trades, settings), [goals, trades, settings]);
 
   const analytics = calculateAnalytics(trades);
   const openTrades = trades.filter(t => t.status === 'open');
@@ -253,6 +261,51 @@ export const DashboardPage = () => {
             </Button>
           </Link>
         </motion.div>
+
+        {/* Foco del Día - Primary Goal */}
+        {primaryGoal && (
+          <motion.div variants={itemVariants}>
+            <Card className="border-2 border-primary bg-primary/5">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-primary fill-primary" />
+                  <CardTitle>Hoy tu única misión es:</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-sm text-muted-foreground mb-1">
+                      {primaryGoal.type === 'pnl' && 'PnL'}
+                      {primaryGoal.type === 'winRate' && 'Tasa de Éxito'}
+                      {primaryGoal.type === 'numTrades' && 'Número de Operaciones'}
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {primaryGoal.type === 'pnl' && formatCurrency(primaryGoal.current, settings.baseCurrency)}
+                      {primaryGoal.type === 'winRate' && formatPercentage(primaryGoal.current)}
+                      {primaryGoal.type === 'numTrades' && primaryGoal.current}
+                      {' / '}
+                      {primaryGoal.type === 'pnl' && formatCurrency(primaryGoal.target, settings.baseCurrency)}
+                      {primaryGoal.type === 'winRate' && formatPercentage(primaryGoal.target)}
+                      {primaryGoal.type === 'numTrades' && primaryGoal.target}
+                    </div>
+                  </div>
+                  {goalBlocking.blocked && (
+                    <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
+                        <div className="text-sm text-destructive">
+                          <div className="font-medium mb-1">Trading Bloqueado</div>
+                          <div>{goalBlocking.message}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Resumen Diario - PRIORITARIO */}
         <motion.div variants={itemVariants}>

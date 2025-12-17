@@ -20,6 +20,8 @@ const STORAGE_KEYS = {
   TEMPLATES: 'trading_log_templates',
   SETUPS: 'trading_log_setups',
   ROUTINE_EXECUTIONS: 'trading_log_routine_executions',
+  GOAL_INSIGHTS: 'trading_log_goal_insights',
+  GOAL_POSTMORTEMS: 'trading_log_goal_postmortems',
 } as const;
 
 /**
@@ -513,6 +515,94 @@ export const setupStorage = {
     const setups = this.getAll();
     const filtered = setups.filter(setup => setup.id !== id);
     this.saveAll(filtered);
+  },
+};
+
+/**
+ * Goal insights storage operations
+ */
+export interface GoalPostMortem {
+  id: string;
+  goalId: string;
+  goalTitle: string;
+  failedAt: string; // ISO date string
+  cause: string;
+  relatedRuleViolations: string[]; // IDs of violated rules
+  historicalPatterns: string[];
+  notes?: string; // Optional free text
+  createdAt: string; // ISO date string
+}
+
+export const goalInsightsStorage = {
+  /**
+   * Get all goal insights
+   */
+  getAll(): Array<{ id: string; goalId: string; [key: string]: any }> {
+    const storage = new StorageService();
+    return storage['load']<Array<{ id: string; goalId: string; [key: string]: any }>>(STORAGE_KEYS.GOAL_INSIGHTS, []);
+  },
+
+  /**
+   * Save all goal insights
+   */
+  saveAll(insights: Array<{ id: string; goalId: string; [key: string]: any }>): void {
+    const storage = new StorageService();
+    storage['save'](STORAGE_KEYS.GOAL_INSIGHTS, insights);
+  },
+
+  /**
+   * Get insights by goal ID
+   */
+  getByGoalId(goalId: string): Array<{ id: string; goalId: string; [key: string]: any }> {
+    const insights = this.getAll();
+    return insights.filter(i => i.goalId === goalId);
+  },
+
+  /**
+   * Add a new goal insight
+   */
+  add(insight: { id: string; goalId: string; [key: string]: any }): void {
+    const insights = this.getAll();
+    insights.push(insight);
+    this.saveAll(insights);
+  },
+};
+
+/**
+ * Goal post-mortem storage operations
+ */
+export const goalPostMortemsStorage = {
+  /**
+   * Get all post-mortems
+   */
+  getAll(): GoalPostMortem[] {
+    const storage = new StorageService();
+    return storage['load']<GoalPostMortem[]>(STORAGE_KEYS.GOAL_POSTMORTEMS, []);
+  },
+
+  /**
+   * Save all post-mortems
+   */
+  saveAll(postMortems: GoalPostMortem[]): void {
+    const storage = new StorageService();
+    storage['save'](STORAGE_KEYS.GOAL_POSTMORTEMS, postMortems);
+  },
+
+  /**
+   * Get post-mortems by goal ID
+   */
+  getByGoalId(goalId: string): GoalPostMortem[] {
+    const postMortems = this.getAll();
+    return postMortems.filter(pm => pm.goalId === goalId);
+  },
+
+  /**
+   * Add a new post-mortem
+   */
+  add(postMortem: GoalPostMortem): void {
+    const postMortems = this.getAll();
+    postMortems.push(postMortem);
+    this.saveAll(postMortems);
   },
 };
 

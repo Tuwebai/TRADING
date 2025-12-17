@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/utils';
-import type { Trade, Settings } from '@/types/Trading';
+import type { Trade, Settings, EmotionType } from '@/types/Trading';
 import { Calendar, Smile } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,24 +40,24 @@ export const DailySummary: React.FC<DailySummaryProps> = ({ trades, settings }) 
   // Estado emocional promedio (si existe) - busca en preTrade, duringTrade o postTrade
   const emotions = todayTrades
     .map(t => t.journal?.preTrade?.emotion || t.journal?.duringTrade?.emotion || t.journal?.postTrade?.emotion)
-    .filter((emotion): emotion is string => emotion !== null && emotion !== undefined);
+    .filter((emotion): emotion is EmotionType => emotion !== null && emotion !== undefined);
   
   const emotionCounts = emotions.reduce((acc, emotion) => {
     acc[emotion] = (acc[emotion] || 0) + 1;
     return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<EmotionType, number>);
 
-  const dominantEmotion = Object.entries(emotionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] as string | undefined;
+  const dominantEmotion = Object.entries(emotionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] as EmotionType | undefined;
 
-  const emotionLabels: Record<string, string> = {
-    confident: 'Confianza',
-    anxious: 'Ansiedad',
-    calm: 'Calma',
-    fearful: 'Miedo',
-    excited: 'Emoción',
-    frustrated: 'Frustración',
-    disciplined: 'Disciplina',
-    greedy: 'Codicia',
+  const emotionLabels: Record<EmotionType, string> = {
+    confiado: 'Confianza',
+    ansioso: 'Ansiedad',
+    temeroso: 'Temor',
+    emocionado: 'Emoción',
+    neutral: 'Neutral',
+    frustrado: 'Frustración',
+    euforico: 'Euforia',
+    deprimido: 'Depresión',
   };
 
   return (
@@ -111,11 +111,11 @@ export const DailySummary: React.FC<DailySummaryProps> = ({ trades, settings }) 
                 <div className="flex items-center gap-2">
                   <Smile className="h-5 w-5" />
                   <p className="text-lg font-semibold">
-                    {emotionLabels[dominantEmotion] || dominantEmotion}
+                    {dominantEmotion ? emotionLabels[dominantEmotion] || dominantEmotion : 'Sin datos'}
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {emotionCounts[dominantEmotion]} de {todayTrades.length} trades
+                  {dominantEmotion ? emotionCounts[dominantEmotion] : 0} de {todayTrades.length} trades
                 </p>
               </>
             ) : (

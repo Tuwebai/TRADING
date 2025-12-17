@@ -1,17 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { useGoalsStore } from '@/store/goalsStore';
 import { useTradeStore } from '@/store/tradeStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { calculateAnalytics } from '@/lib/calculations';
-import { Target, Plus, Trash2, Edit2, TrendingUp, CheckCircle2, XCircle } from 'lucide-react';
-import type { GoalPeriod, GoalType } from '@/types/Trading';
+import { Target, Plus, Trash2, Edit2, TrendingUp, CheckCircle2, XCircle, Star, Download, AlertTriangle, FileText } from 'lucide-react';
+import type { GoalPeriod, GoalType, TradingGoal } from '@/types/Trading';
 import { formatCurrency, formatPercentage } from '@/lib/utils';
+import { simulateGoalFuture } from '@/lib/goalSimulation';
+import { exportGoalsToPDF } from '@/lib/goalExport';
+import { getActiveGoalConstraints } from '@/lib/goalConstraints';
+import { evaluateGoals } from '@/lib/goalIntegration';
 
 const periodLabels: Record<GoalPeriod, string> = {
   daily: 'Diario',
@@ -27,17 +32,23 @@ const typeLabels: Record<GoalType, string> = {
 };
 
 export const GoalsPage = () => {
-  const { goals, loadGoals, addGoal, updateGoal, deleteGoal, getGoalsByPeriod } = useGoalsStore();
+  const { goals, loadGoals, addGoal, updateGoal, deleteGoal, getGoalsByPeriod, setPrimaryGoal, getPrimaryGoal } = useGoalsStore();
   const { trades, loadTrades } = useTradeStore();
-  const { settings } = useSettingsStore();
+  const { settings, updateSettings } = useSettingsStore();
   const [selectedPeriod, setSelectedPeriod] = useState<GoalPeriod>('daily');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<string | null>(null);
+  const [showSimulation, setShowSimulation] = useState(false);
 
   const [formData, setFormData] = useState({
     period: 'daily' as GoalPeriod,
     type: 'pnl' as GoalType,
     target: 0,
+    isPrimary: false,
+    isBinding: false,
+    constraintType: 'none' as TradingGoal['constraintType'],
+    constraintConfig: undefined as TradingGoal['constraintConfig'],
+    consequences: undefined as TradingGoal['consequences'],
   });
 
   useEffect(() => {
@@ -45,10 +56,16 @@ export const GoalsPage = () => {
     loadTrades();
   }, [loadGoals, loadTrades]);
 
-  // Calcular progreso de objetivos basado en trades reales
+  // Calcular progreso de objetivos basado en trades reales y evaluar fallos
   useEffect(() => {
     const analytics = calculateAnalytics(trades);
     const now = new Date();
+    const previousStates = new Map<string, number>();
+    
+    // Store previous states
+    goals.forEach(goal => {
+      previousStates.set(goal.id, goal.current);
+    });
 
     goals.forEach(goal => {
       let current = 0;
@@ -82,11 +99,28 @@ export const GoalsPage = () => {
         }
       }
     });
-  }, [trades, goals, updateGoal]);
+
+    // Evaluate goals after state updates (in next tick to avoid stale state)
+    // This will generate insights and post-mortems when goals fail
+    setTimeout(() => {
+      const { goals: updatedGoals } = useGoalsStore.getState();
+      evaluateGoals(updatedGoals, trades, settings, updateGoal, updateSettings, previousStates);
+    }, 100);
+  }, [trades, goals, updateGoal, settings, updateSettings]);
 
   const handleAddGoal = () => {
     setEditingGoal(null);
-    setFormData({ period: selectedPeriod, type: 'pnl', target: 0 });
+    setFormData({ 
+      period: selectedPeriod, 
+      type: 'pnl', 
+      target: 0,
+      isPrimary: false,
+      isBinding: false,
+      constraintType: 'none',
+      constraintConfig: undefined,
+      consequences: undefined,
+    });
+    setShowSimulation(false);
     setIsModalOpen(true);
   };
 
@@ -98,7 +132,13 @@ export const GoalsPage = () => {
         period: goal.period,
         type: goal.type,
         target: goal.target,
+        isPrimary: goal.isPrimary || false,
+        isBinding: goal.isBinding || false,
+        constraintType: goal.constraintType || 'none',
+        constraintConfig: goal.constraintConfig,
+        consequences: goal.consequences,
       });
+      setShowSimulation(false);
       setIsModalOpen(true);
     }
   };
@@ -108,12 +148,33 @@ export const GoalsPage = () => {
       updateGoal(editingGoal, {
         type: formData.type,
         target: formData.target,
+        isPrimary: formData.isPrimary,
+        isBinding: formData.isBinding,
+        constraintType: formData.constraintType,
+        constraintConfig: formData.constraintConfig,
+        consequences: formData.consequences,
       });
+      if (formData.isPrimary) {
+        setPrimaryGoal(editingGoal);
+      }
     } else {
-      addGoal(formData.period, formData.type, formData.target);
+      addGoal(formData.period, formData.type, formData.target, {
+        isPrimary: formData.isPrimary,
+        isBinding: formData.isBinding,
+        constraintType: formData.constraintType,
+        constraintConfig: formData.constraintConfig,
+        consequences: formData.consequences,
+      });
+      if (formData.isPrimary) {
+        const newGoal = goals[goals.length - 1];
+        if (newGoal) {
+          setPrimaryGoal(newGoal.id);
+        }
+      }
     }
     setIsModalOpen(false);
     setEditingGoal(null);
+    setShowSimulation(false);
   };
 
   const handleDelete = (goalId: string) => {
@@ -161,6 +222,34 @@ export const GoalsPage = () => {
     return Math.min((goal.current / goal.target) * 100, 100);
   };
 
+  // Get primary goal (Foco del Día)
+  const primaryGoal = useMemo(() => getPrimaryGoal(), [goals, getPrimaryGoal]);
+  
+  // Get active constraints
+  const activeConstraints = useMemo(() => getActiveGoalConstraints(goals, trades, settings), [goals, trades, settings]);
+  
+  // Simulation data
+  const simulationData = useMemo(() => {
+    if (!showSimulation || !formData.target) return null;
+    const tempGoal: TradingGoal = {
+      id: 'temp',
+      period: formData.period,
+      type: formData.type,
+      target: formData.target,
+      current: 0,
+      startDate: new Date().toISOString(),
+      endDate: new Date().toISOString(),
+      completed: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    return simulateGoalFuture(tempGoal, trades, settings);
+  }, [showSimulation, formData, trades, settings]);
+
+  const handleExportPDF = () => {
+    exportGoalsToPDF(goals, trades, settings);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -170,11 +259,61 @@ export const GoalsPage = () => {
             Establece y rastrea tus objetivos de trading
           </p>
         </div>
-        <Button onClick={handleAddGoal}>
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar Objetivo
-        </Button>
+        <div className="flex gap-2">
+          {goals.length > 0 && (
+            <Button variant="outline" onClick={handleExportPDF}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar PDF
+            </Button>
+          )}
+          <Button onClick={handleAddGoal}>
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Objetivo
+          </Button>
+        </div>
       </div>
+
+      {/* Foco del Día - Primary Goal Display */}
+      {primaryGoal && (
+        <Card className="border-2 border-primary bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-primary fill-primary" />
+              <CardTitle>Hoy tu única misión es:</CardTitle>
+            </div>
+            <CardDescription>
+              {typeLabels[primaryGoal.type]} - {periodLabels[primaryGoal.period]}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Progreso</span>
+                <span className="text-lg font-bold">
+                  {formatGoalValue(primaryGoal)} / {formatTarget(primaryGoal)}
+                </span>
+              </div>
+              <div className="w-full h-4 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${getProgress(primaryGoal)}%` }}
+                />
+              </div>
+              {activeConstraints.length > 0 && (
+                <div className="mt-4 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
+                    <div className="text-sm">
+                      <div className="font-medium text-warning mb-1">Restricción Activa</div>
+                      <div className="text-muted-foreground">{activeConstraints[0].message}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filtro por período */}
       <Card>
@@ -201,10 +340,18 @@ export const GoalsPage = () => {
             const isCompleted = goal.completed || progress >= 100;
 
             return (
-              <Card key={goal.id} className={isCompleted ? 'border-profit bg-profit border-2' : ''}>
+              <Card key={goal.id} className={isCompleted ? 'border-profit bg-profit border-2' : goal.isPrimary ? 'border-primary border-2' : ''}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{typeLabels[goal.type]}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg">{typeLabels[goal.type]}</CardTitle>
+                      {goal.isPrimary && (
+                        <Star className="h-4 w-4 text-primary fill-primary" />
+                      )}
+                      {goal.isBinding && (
+                        <FileText className="h-4 w-4 text-destructive" />
+                      )}
+                    </div>
                     {isCompleted ? (
                       <CheckCircle2 className="h-5 w-5 text-profit" />
                     ) : (
@@ -213,6 +360,8 @@ export const GoalsPage = () => {
                   </div>
                   <CardDescription>
                     Objetivo {periodLabels[goal.period]}
+                    {goal.isPrimary && ' • Foco del Día'}
+                    {goal.isBinding && ' • Vinculante'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -265,6 +414,17 @@ export const GoalsPage = () => {
                   </div>
 
                   <div className="flex gap-2 pt-2">
+                    {!goal.isPrimary && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPrimaryGoal(goal.id)}
+                        className="flex-1 text-xs"
+                      >
+                        <Star className="h-3 w-3 mr-1" />
+                        Hacer Primario
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -349,9 +509,10 @@ export const GoalsPage = () => {
         onClose={() => {
           setIsModalOpen(false);
           setEditingGoal(null);
+          setShowSimulation(false);
         }}
         title={editingGoal ? 'Editar Objetivo' : 'Agregar Objetivo'}
-        size="md"
+        size="lg"
       >
         <div className="space-y-4">
           <div>
@@ -391,7 +552,13 @@ export const GoalsPage = () => {
               type="number"
               step={formData.type === 'winRate' ? '0.1' : '0.01'}
               value={formData.target}
-              onChange={(e) => setFormData({ ...formData, target: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => {
+                const newTarget = parseFloat(e.target.value) || 0;
+                setFormData({ ...formData, target: newTarget });
+                if (newTarget > 0) {
+                  setShowSimulation(true);
+                }
+              }}
               required
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -401,12 +568,92 @@ export const GoalsPage = () => {
             </p>
           </div>
 
+          {/* Simulación de Futuro */}
+          {showSimulation && simulationData && formData.target > 0 && (
+            <Card className="border-2">
+              <CardHeader>
+                <CardTitle className="text-sm">Simulación de Futuro (90 días)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {simulationData.warning && (
+                  <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
+                      <div className="text-sm text-warning">{simulationData.warning}</div>
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Conservadora</div>
+                    <div className="font-bold">{formData.type === 'pnl' 
+                      ? formatCurrency(simulationData.projectionBreakdown.conservative, settings.baseCurrency)
+                      : formData.type === 'winRate'
+                      ? formatPercentage(simulationData.projectionBreakdown.conservative)
+                      : simulationData.projectionBreakdown.conservative.toFixed(0)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Moderada</div>
+                    <div className="font-bold">{formData.type === 'pnl' 
+                      ? formatCurrency(simulationData.projectionBreakdown.moderate, settings.baseCurrency)
+                      : formData.type === 'winRate'
+                      ? formatPercentage(simulationData.projectionBreakdown.moderate)
+                      : simulationData.projectionBreakdown.moderate.toFixed(0)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Optimista</div>
+                    <div className="font-bold">{formData.type === 'pnl' 
+                      ? formatCurrency(simulationData.projectionBreakdown.optimistic, settings.baseCurrency)
+                      : formData.type === 'winRate'
+                      ? formatPercentage(simulationData.projectionBreakdown.optimistic)
+                      : simulationData.projectionBreakdown.optimistic.toFixed(0)}</div>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Proyección basada en tu historial de trading.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Opciones Avanzadas */}
+          <div className="border-t pt-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="isPrimary"
+                checked={formData.isPrimary}
+                onChange={(e) => setFormData({ ...formData, isPrimary: e.target.checked })}
+              />
+              <Label htmlFor="isPrimary" className="cursor-pointer">
+                Establecer como "Foco del Día" (Objetivo Primario)
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground ml-6">
+              Solo un objetivo puede ser primario a la vez. Este será tu único objetivo visible en el dashboard.
+            </p>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="isBinding"
+                checked={formData.isBinding}
+                onChange={(e) => setFormData({ ...formData, isBinding: e.target.checked })}
+              />
+              <Label htmlFor="isBinding" className="cursor-pointer">
+                Objetivo Vinculante (Modo Avanzado)
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground ml-6">
+              Si este objetivo falla, se aplicarán consecuencias automáticas configuradas.
+            </p>
+          </div>
+
           <div className="flex justify-end gap-2">
             <Button
               variant="outline"
               onClick={() => {
                 setIsModalOpen(false);
                 setEditingGoal(null);
+                setShowSimulation(false);
               }}
             >
               Cancelar
