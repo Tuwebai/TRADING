@@ -7,6 +7,8 @@ import type { Trade, Settings } from '@/types/Trading';
 import { calculateAnalytics, generateEquityCurve, calculateMaxDrawdown } from './calculations';
 import { getRiskMetrics } from './risk';
 import { getTradesByMonth } from './calendarStats';
+import { goalInsightsStorage } from './storage';
+import { goalInsightToProactiveInsight } from './goalInsights';
 
 export type InsightSeverity = 'critical' | 'important' | 'positive';
 
@@ -392,30 +394,47 @@ export function generateProactiveInsights(trades: Trade[], settings: Settings): 
 }
 
 /**
- * Obtiene los insights prioritarios (máximo 3)
+ * Obtiene los insights prioritarios (máximo 5)
+ * Incluye insights generados por objetivos fallidos
  */
 export function getPriorityInsights(trades: Trade[], settings: Settings): ProactiveInsight[] {
   const allInsights = generateProactiveInsights(trades, settings);
   
-  // Si hay insights críticos, mostrar solo críticos (máximo 3)
+  // Agregar insights generados por objetivos
+  try {
+    const goalInsights = goalInsightsStorage.getAll();
+    const recentGoalInsights = goalInsights
+      .filter((gi: any) => {
+        const generatedAt = new Date(gi.generatedAt);
+        const daysSince = (Date.now() - generatedAt.getTime()) / (1000 * 60 * 60 * 24);
+        return daysSince <= 7; // Solo insights de los últimos 7 días
+      })
+      .map((gi: any) => goalInsightToProactiveInsight(gi));
+    
+    allInsights.push(...recentGoalInsights);
+  } catch (error) {
+    console.error('Error loading goal insights:', error);
+  }
+  
+  // Si hay insights críticos, mostrar solo críticos (máximo 5)
   const criticalInsights = allInsights.filter(i => i.severity === 'critical');
   if (criticalInsights.length > 0) {
-    return criticalInsights.slice(0, 3);
+    return criticalInsights.slice(0, 5);
   }
 
-  // Si hay insights importantes, mostrar importantes (máximo 2) + 1 positivo si existe
+  // Si hay insights importantes, mostrar importantes (máximo 3) + positivos
   const importantInsights = allInsights.filter(i => i.severity === 'important');
   const positiveInsights = allInsights.filter(i => i.severity === 'positive');
   
   if (importantInsights.length > 0) {
-    const result = importantInsights.slice(0, 2);
-    if (positiveInsights.length > 0 && result.length < 3) {
-      result.push(positiveInsights[0]);
+    const result = importantInsights.slice(0, 3);
+    if (positiveInsights.length > 0 && result.length < 5) {
+      result.push(...positiveInsights.slice(0, 5 - result.length));
     }
     return result;
   }
 
-  // Solo positivos (máximo 3)
-  return positiveInsights.slice(0, 3);
+  // Solo positivos (máximo 5)
+  return positiveInsights.slice(0, 5);
 }
 

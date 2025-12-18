@@ -17,9 +17,11 @@ import { BlockedOverlay } from '@/components/trading/BlockedOverlay';
 import { Plus, Download } from 'lucide-react';
 import { useTradeStore } from '@/store/tradeStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useGoalsStore } from '@/store/goalsStore';
 import { useTemplateStore } from '@/store/templateStore';
 import { checkTradingRules, isBlocked, blockUser } from '@/lib/tradingRules';
 import { isPreTradeComplete } from '@/lib/routineDiscipline';
+import { shouldBlockTradingDueToGoals } from '@/lib/goalConstraints';
 import { useEvaluatedTrades } from '@/hooks/useTradeRuleEvaluation';
 import { initializeBackupSystem } from '@/lib/backup';
 import { useCommonShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -46,6 +48,7 @@ export const TradesPage = () => {
   } = useTradeStore();
   
   const { settings, updateSettings } = useSettingsStore();
+  const { goals, loadGoals } = useGoalsStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExportImportModalOpen, setIsExportImportModalOpen] = useState(false);
@@ -58,8 +61,9 @@ export const TradesPage = () => {
 
   useEffect(() => {
     loadTrades();
+    loadGoals();
     loadTemplates();
-  }, [loadTrades, loadTemplates]);
+  }, [loadTrades, loadGoals, loadTemplates]);
 
   // Evaluate trades on-demand using hook
   const evaluatedTrades = useEvaluatedTrades(trades, settings);
@@ -123,6 +127,13 @@ export const TradesPage = () => {
       
       if (!preTradeCheck.complete) {
         alert(`🔴 CREACIÓN DE OPERACIÓN BLOQUEADA\n\n${preTradeCheck.message}\n\nDebes completar la Lista Pre-Operación al 100% antes de crear cualquier operación.\n\nVe a /routines para completar tu rutina.`);
+        return;
+      }
+
+      // 4️⃣ ENFORCEMENT: Check if goals are blocking trading
+      const goalBlocking = shouldBlockTradingDueToGoals(goals, trades, settings);
+      if (goalBlocking.blocked) {
+        alert(`🔴 CREACIÓN DE OPERACIÓN BLOQUEADA\n\n${goalBlocking.message}\n\nEste bloqueo está relacionado con tus objetivos activos.`);
         return;
       }
       

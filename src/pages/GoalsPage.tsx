@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
 import { Checkbox } from '@/components/ui/Checkbox';
+import { CollapsibleWithTitle } from '@/components/ui/CollapsibleWithTitle';
 import { useGoalsStore } from '@/store/goalsStore';
 import { useTradeStore } from '@/store/tradeStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -17,6 +18,7 @@ import { simulateGoalFuture } from '@/lib/goalSimulation';
 import { exportGoalsToPDF } from '@/lib/goalExport';
 import { getActiveGoalConstraints } from '@/lib/goalConstraints';
 import { evaluateGoals } from '@/lib/goalIntegration';
+import { goalPostMortemsStorage, type GoalPostMortem } from '@/lib/storage';
 
 const periodLabels: Record<GoalPeriod, string> = {
   daily: 'Diario',
@@ -463,6 +465,59 @@ export const GoalsPage = () => {
         )}
       </div>
 
+      {/* Post-Mortems de Objetivos Fallidos */}
+      {(() => {
+        const postMortems = goalPostMortemsStorage.getAll();
+        const recentPostMortems = postMortems
+          .sort((a: GoalPostMortem, b: GoalPostMortem) => new Date(b.failedAt).getTime() - new Date(a.failedAt).getTime())
+          .slice(0, 5);
+        
+        return recentPostMortems.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Análisis Post-Mortem</CardTitle>
+              <CardDescription>
+                Análisis automático de objetivos fallidos recientemente
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {recentPostMortems.map((pm: GoalPostMortem) => (
+                <div key={pm.id} className="p-4 border rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold">{pm.goalTitle}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(pm.failedAt).toLocaleDateString('es-ES')}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium mb-1">Causa Probable:</div>
+                    <div className="text-sm text-muted-foreground">{pm.cause}</div>
+                  </div>
+                  {pm.relatedRuleViolations.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium mb-1">Reglas Violadas:</div>
+                      <div className="text-sm text-muted-foreground">
+                        {pm.relatedRuleViolations.join(', ')}
+                      </div>
+                    </div>
+                  )}
+                  {pm.historicalPatterns.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium mb-1">Patrones Históricos:</div>
+                      <ul className="text-sm text-muted-foreground list-disc list-inside">
+                        {pm.historicalPatterns.map((pattern: string, idx: number) => (
+                          <li key={idx}>{pattern}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null;
+      })()}
+
       {/* Resumen de todos los objetivos */}
       {goals.length > 0 && (
         <Card>
@@ -645,6 +700,201 @@ export const GoalsPage = () => {
             <p className="text-xs text-muted-foreground ml-6">
               Si este objetivo falla, se aplicarán consecuencias automáticas configuradas.
             </p>
+
+            {/* Configuración de Restricciones */}
+            {formData.isBinding && (
+              <CollapsibleWithTitle
+                title="Configurar Restricciones de UI"
+                description="Define cómo este objetivo afecta la interfaz cuando está activo"
+                defaultOpen={false}
+              >
+                <div className="space-y-3 mt-3 ml-6">
+                  <div>
+                    <Label htmlFor="constraintType">Tipo de Restricción</Label>
+                    <Select
+                      id="constraintType"
+                      value={formData.constraintType}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        constraintType: e.target.value as TradingGoal['constraintType'],
+                        constraintConfig: e.target.value === 'none' ? undefined : formData.constraintConfig,
+                      })}
+                    >
+                      <option value="none">Ninguna</option>
+                      <option value="session">Restringir a Sesión Específica</option>
+                      <option value="hours">Restringir a Horas Específicas</option>
+                      <option value="max-trades">Bloquear después de X trades</option>
+                      <option value="max-loss">Bloquear después de X pérdida</option>
+                    </Select>
+                  </div>
+
+                  {formData.constraintType === 'session' && (
+                    <div>
+                      <Label htmlFor="session">Sesión</Label>
+                      <Select
+                        id="session"
+                        value={formData.constraintConfig?.session || 'new-york'}
+                        onChange={(e) => setFormData({ 
+                          ...formData, 
+                          constraintConfig: { session: e.target.value as any },
+                        })}
+                      >
+                        <option value="asian">Asian</option>
+                        <option value="london">London</option>
+                        <option value="new-york">New York</option>
+                        <option value="overlap">Overlap</option>
+                      </Select>
+                    </div>
+                  )}
+
+                  {formData.constraintType === 'hours' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label htmlFor="startHour">Hora Inicio</Label>
+                        <Input
+                          id="startHour"
+                          type="number"
+                          min="0"
+                          max="23"
+                          value={formData.constraintConfig?.startHour || 9}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            constraintConfig: { 
+                              startHour: parseInt(e.target.value) || 9,
+                              endHour: formData.constraintConfig?.endHour || 17,
+                            },
+                          })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="endHour">Hora Fin</Label>
+                        <Input
+                          id="endHour"
+                          type="number"
+                          min="0"
+                          max="23"
+                          value={formData.constraintConfig?.endHour || 17}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            constraintConfig: { 
+                              startHour: formData.constraintConfig?.startHour || 9,
+                              endHour: parseInt(e.target.value) || 17,
+                            },
+                          })}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {(formData.constraintType === 'max-trades' || formData.constraintType === 'max-loss') && (
+                    <div>
+                      <Label htmlFor="maxValue">Valor Máximo</Label>
+                      <Input
+                        id="maxValue"
+                        type="number"
+                        step={formData.constraintType === 'max-loss' ? '0.01' : '1'}
+                        value={formData.constraintConfig?.maxValue || formData.target}
+                        onChange={(e) => setFormData({ 
+                          ...formData, 
+                          constraintConfig: { maxValue: parseFloat(e.target.value) || formData.target },
+                        })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formData.constraintType === 'max-trades' 
+                          ? 'Número máximo de trades antes de bloquear'
+                          : 'Pérdida máxima antes de bloquear'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleWithTitle>
+            )}
+
+            {/* Configuración de Consecuencias */}
+            {formData.isBinding && (
+              <CollapsibleWithTitle
+                title="Configurar Consecuencias"
+                description="Define qué ocurre cuando este objetivo vinculante falla"
+                defaultOpen={false}
+              >
+                <div className="space-y-3 mt-3 ml-6">
+                  <div>
+                    <Label htmlFor="cooldownHours">Cooldown (horas)</Label>
+                    <Input
+                      id="cooldownHours"
+                      type="number"
+                      min="0"
+                      value={formData.consequences?.cooldownHours || 0}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        consequences: {
+                          ...formData.consequences,
+                          cooldownHours: parseInt(e.target.value) || 0,
+                        },
+                      })}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Horas de bloqueo de trading después de fallar (0 = sin cooldown)
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="reduceRiskPercent">Reducir Riesgo (%)</Label>
+                    <Input
+                      id="reduceRiskPercent"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={formData.consequences?.reduceRiskPercent || 0}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        consequences: {
+                          ...formData.consequences,
+                          reduceRiskPercent: parseFloat(e.target.value) || 0,
+                        },
+                      })}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Porcentaje de reducción del riesgo por trade después de fallar
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="blockPartial"
+                      checked={formData.consequences?.blockPartial || false}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        consequences: {
+                          ...formData.consequences,
+                          blockPartial: e.target.checked,
+                        },
+                      })}
+                    />
+                    <Label htmlFor="blockPartial" className="cursor-pointer">
+                      Bloqueo Parcial (deshabilitar creación de trades)
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="blockFull"
+                      checked={formData.consequences?.blockFull || false}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        consequences: {
+                          ...formData.consequences,
+                          blockFull: e.target.checked,
+                        },
+                      })}
+                    />
+                    <Label htmlFor="blockFull" className="cursor-pointer">
+                      Bloqueo Completo (bloquear todo el sistema)
+                    </Label>
+                  </div>
+                </div>
+              </CollapsibleWithTitle>
+            )}
           </div>
 
           <div className="flex justify-end gap-2">

@@ -25,10 +25,13 @@ import { checkTradingRules, isBlocked } from '@/lib/tradingRules';
 import { calculateTradingStatus } from '@/lib/tradingStatus';
 import { useNavigate } from 'react-router-dom';
 import type { Trade } from '@/types/Trading';
+import { useGoalsStore } from '@/store/goalsStore';
+import { shouldBlockTradingDueToGoals } from '@/lib/goalConstraints';
 
 export const GraficoPage = () => {
   const { settings, loadSettings } = useSettingsStore();
   const { trades, loadTrades } = useTradeStore();
+  const { goals, loadGoals } = useGoalsStore();
   const navigate = useNavigate();
   
   const [symbol, setSymbol] = useState('EURUSD');
@@ -38,7 +41,8 @@ export const GraficoPage = () => {
   useEffect(() => {
     loadSettings();
     loadTrades();
-  }, [loadSettings, loadTrades]);
+    loadGoals();
+  }, [loadSettings, loadTrades, loadGoals]);
 
   // Extract asset name from symbol (handle formats like "NASDAQ:AAPL" -> "AAPL")
   const currentAsset = useMemo(() => {
@@ -95,8 +99,11 @@ export const GraficoPage = () => {
   // Check if blocked
   const blocked = isBlocked(settings);
 
+  // Check goal constraints
+  const goalBlocking = useMemo(() => shouldBlockTradingDueToGoals(goals, trades, settings), [goals, trades, settings]);
+
   // Check if can trade (no critical violations)
-  const canTrade = !blocked && globalRiskStatus.status !== 'blocked' && tradingStatus.status === 'operable';
+  const canTrade = !blocked && globalRiskStatus.status !== 'blocked' && tradingStatus.status === 'operable' && !goalBlocking.blocked;
 
   // Símbolos comunes de trading
   const commonSymbols = [
