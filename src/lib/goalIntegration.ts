@@ -30,33 +30,57 @@ export function evaluateGoals(
     // Check if goal just failed
     const isMaxGoal = goal.type === 'numTrades';
     
+    const wasFailing = isMaxGoal
+      ? previousCurrent > goal.target
+      : previousCurrent < goal.target;
+    
     const isNowFailing = isMaxGoal
       ? goal.current > goal.target
       : goal.current < goal.target;
 
-    // Generate insight if goal failed
-    if (isNowFailing && !goal.completed) {
-      const insight = generateGoalFailureInsight(goal, trades, settings);
-      if (insight) {
-        // Store insight
-        goalInsightsStorage.add(insight);
-        
-        // Update goal with insight ID
-        const insightIds = goal.generatedInsightIds || [];
-        if (!insightIds.includes(insight.id)) {
-          updateGoal(goal.id, {
-            generatedInsightIds: [...insightIds, insight.id],
-            failureCount: (goal.failureCount || 0) + 1,
-            failedAt: new Date().toISOString(),
-            lastFailedAt: new Date().toISOString(),
-          });
-        }
+    // Only generate insight/post-mortem if goal JUST failed (transition from not failing to failing)
+    const justFailed = !wasFailing && isNowFailing;
 
-        // Generate post-mortem if this is a critical failure or binding goal
-        if (goal.isBinding || (goal.failureCount && goal.failureCount > 2)) {
-          const postMortem = generateGoalPostMortem(goal, trades, settings);
-          if (postMortem) {
-            goalPostMortemsStorage.add(postMortem);
+    // Generate insight only if goal just failed (transition)
+    if (justFailed && !goal.completed) {
+      // Check if we already generated an insight for this goal today
+      const today = new Date().toISOString().split('T')[0];
+      const existingInsights = goalInsightsStorage.getByGoalId(goal.id);
+      const hasInsightToday = existingInsights.some((insight: any) => {
+        const insightDate = new Date(insight.generatedAt).toISOString().split('T')[0];
+        return insightDate === today;
+      });
+
+      if (!hasInsightToday) {
+        const insight = generateGoalFailureInsight(goal, trades, settings);
+        if (insight) {
+          // Store insight
+          goalInsightsStorage.add(insight);
+          
+          // Update goal with insight ID and increment failure count
+          const insightIds = goal.generatedInsightIds || [];
+          if (!insightIds.includes(insight.id)) {
+            updateGoal(goal.id, {
+              generatedInsightIds: [...insightIds, insight.id],
+              failureCount: (goal.failureCount || 0) + 1,
+              failedAt: new Date().toISOString(),
+              lastFailedAt: new Date().toISOString(),
+            });
+          }
+
+          // Generate post-mortem if this is a critical failure or binding goal
+          // Check if we already have a post-mortem for this goal today
+          const existingPostMortems = goalPostMortemsStorage.getByGoalId(goal.id);
+          const hasPostMortemToday = existingPostMortems.some((pm: any) => {
+            const pmDate = new Date(pm.failedAt).toISOString().split('T')[0];
+            return pmDate === today;
+          });
+
+          if (!hasPostMortemToday && (goal.isBinding || (goal.failureCount && goal.failureCount > 2))) {
+            const postMortem = generateGoalPostMortem(goal, trades, settings);
+            if (postMortem) {
+              goalPostMortemsStorage.add(postMortem);
+            }
           }
         }
       }

@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import type { Trade } from '@/types/Trading';
+import { goalInsightsStorage, goalPostMortemsStorage } from './storage';
 
 /**
  * Flatten trade data for CSV/Excel export
@@ -295,27 +296,56 @@ export function saveBackupToLocalStorage(trades: Trade[]): void {
   try {
     localStorage.setItem(backupKey, backup);
     
-    // Keep only last 30 days of backups
+    // Keep only last 7 days of backups to avoid quota exceeded
     const keys = Object.keys(localStorage);
     const backupKeys = keys.filter(k => k.startsWith('trading_backup_')).sort();
     
-    if (backupKeys.length > 30) {
-      const keysToRemove = backupKeys.slice(0, backupKeys.length - 30);
+    if (backupKeys.length > 7) {
+      const keysToRemove = backupKeys.slice(0, backupKeys.length - 7);
       keysToRemove.forEach(key => localStorage.removeItem(key));
     }
   } catch (error) {
     console.error('Error saving backup to localStorage:', error);
-    // If localStorage is full, try to clear old backups
+    // If localStorage is full, try to clear old backups more aggressively
     const keys = Object.keys(localStorage);
     const backupKeys = keys.filter(k => k.startsWith('trading_backup_')).sort();
     if (backupKeys.length > 0) {
-      // Remove oldest 10 backups
-      backupKeys.slice(0, 10).forEach(key => localStorage.removeItem(key));
+      // Remove all but the last 3 backups
+      const keysToRemove = backupKeys.slice(0, Math.max(0, backupKeys.length - 3));
+      keysToRemove.forEach(key => {
+        try {
+          localStorage.removeItem(key);
+        } catch (e) {
+          // Ignore errors when removing
+        }
+      });
       // Try again
       try {
         localStorage.setItem(backupKey, backup);
       } catch (retryError) {
         console.error('Failed to save backup after cleanup:', retryError);
+        // If still fails, try removing goal insights and post-mortems that are too old
+        try {
+          const goalInsights = goalInsightsStorage.getAll();
+          // Remove insights older than 30 days
+          const newInsights = goalInsights.filter((gi: any) => {
+            const daysSince = (Date.now() - new Date(gi.generatedAt).getTime()) / (1000 * 60 * 60 * 24);
+            return daysSince <= 30;
+          });
+          goalInsightsStorage.saveAll(newInsights);
+          
+          const postMortems = goalPostMortemsStorage.getAll();
+          const newPostMortems = postMortems.filter((pm: any) => {
+            const daysSince = (Date.now() - new Date(pm.failedAt).getTime()) / (1000 * 60 * 60 * 24);
+            return daysSince <= 30; // Keep only last 30 days of post-mortems
+          });
+          goalPostMortemsStorage.saveAll(newPostMortems);
+          
+          // Try one more time
+          localStorage.setItem(backupKey, backup);
+        } catch (finalError) {
+          console.error('Final attempt to save backup failed:', finalError);
+        }
       }
     }
   }

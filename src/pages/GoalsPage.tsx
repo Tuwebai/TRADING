@@ -468,7 +468,17 @@ export const GoalsPage = () => {
       {/* Post-Mortems de Objetivos Fallidos */}
       {(() => {
         const postMortems = goalPostMortemsStorage.getAll();
-        const recentPostMortems = postMortems
+        // Filtrar duplicados: solo un post-mortem por goalId por fecha
+        const uniquePostMortems = new Map<string, GoalPostMortem>();
+        postMortems.forEach((pm: GoalPostMortem) => {
+          const pmDate = new Date(pm.failedAt).toISOString().split('T')[0];
+          const key = `${pm.goalId}_${pmDate}`;
+          if (!uniquePostMortems.has(key)) {
+            uniquePostMortems.set(key, pm);
+          }
+        });
+        
+        const recentPostMortems = Array.from(uniquePostMortems.values())
           .sort((a: GoalPostMortem, b: GoalPostMortem) => new Date(b.failedAt).getTime() - new Date(a.failedAt).getTime())
           .slice(0, 5);
         

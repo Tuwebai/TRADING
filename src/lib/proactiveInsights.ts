@@ -400,14 +400,28 @@ export function generateProactiveInsights(trades: Trade[], settings: Settings): 
 export function getPriorityInsights(trades: Trade[], settings: Settings): ProactiveInsight[] {
   const allInsights = generateProactiveInsights(trades, settings);
   
-  // Agregar insights generados por objetivos
+  // Agregar insights generados por objetivos (evitar duplicados)
   try {
     const goalInsights = goalInsightsStorage.getAll();
+    const today = new Date().toISOString().split('T')[0];
+    const seenGoalIds = new Set<string>();
+    
     const recentGoalInsights = goalInsights
       .filter((gi: any) => {
         const generatedAt = new Date(gi.generatedAt);
         const daysSince = (Date.now() - generatedAt.getTime()) / (1000 * 60 * 60 * 24);
-        return daysSince <= 7; // Solo insights de los últimos 7 días
+        const insightDate = generatedAt.toISOString().split('T')[0];
+        
+        // Solo insights de los últimos 7 días
+        if (daysSince > 7) return false;
+        
+        // Solo un insight por objetivo por día (evitar duplicados)
+        if (insightDate === today && seenGoalIds.has(gi.goalId)) {
+          return false;
+        }
+        
+        seenGoalIds.add(gi.goalId);
+        return true;
       })
       .map((gi: any) => goalInsightToProactiveInsight(gi));
     
