@@ -439,6 +439,11 @@ export const TradesPage = () => {
               }}
               autoDetectedFields={ocrExtractedData?.detectedFields || []}
               ocrImageBase64={ocrExtractedData?.imageBase64}
+              onViewTrade={(tradeId) => {
+                // Close modal and show trade details
+                setIsModalOpen(false);
+                setSelectedTrade(tradeId);
+              }}
             />
           </>
         )}

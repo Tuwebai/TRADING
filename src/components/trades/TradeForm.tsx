@@ -17,6 +17,18 @@ import { checkTradingRules } from '@/lib/tradingRules';
 import type { RuleViolation } from '@/lib/tradingRules';
 import type { TradeFormData, PositionType, Trade, TradeJournal, TradingSession } from '@/types/Trading';
 import { isForexPair, calculateSwap } from '@/lib/forexCalculations';
+import { 
+  getContextualSuggestions, 
+  getHistoricalWarnings, 
+  findSimilarTrades,
+  hasEnoughContextData,
+  type ContextualSuggestion,
+  type HistoricalWarning,
+  type SimilarTrade
+} from '@/lib/tradeContext';
+import { ContextualSuggestions } from './ContextualSuggestions';
+import { HistoricalWarnings } from './HistoricalWarnings';
+import { SimilarTradeModal } from './SimilarTradeModal';
 
 interface TradeFormProps {
   trade?: Trade | null;
@@ -25,6 +37,7 @@ interface TradeFormProps {
   onCancel: () => void;
   autoDetectedFields?: string[]; // Fields that were auto-detected from OCR
   ocrImageBase64?: string; // Base64 image from OCR to include in screenshots
+  onViewTrade?: (tradeId: string) => void; // Callback to view a trade (for similar trades modal)
 }
 
 export const TradeForm: React.FC<TradeFormProps> = ({ 
@@ -34,6 +47,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
   onCancel,
   autoDetectedFields = [],
   ocrImageBase64,
+  onViewTrade,
 }) => {
   const { settings } = useSettingsStore();
   const { trades } = useTradeStore();
@@ -65,6 +79,11 @@ export const TradeForm: React.FC<TradeFormProps> = ({
   };
 
   const [ruleViolations, setRuleViolations] = useState<RuleViolation[]>([]);
+  const [contextualSuggestions, setContextualSuggestions] = useState<ContextualSuggestion[]>([]);
+  const [historicalWarnings, setHistoricalWarnings] = useState<HistoricalWarning[]>([]);
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
+  const [showSimilarTradeModal, setShowSimilarTradeModal] = useState(false);
+  const [similarTrades, setSimilarTrades] = useState<SimilarTrade[]>([]);
   
   const [formData, setFormData] = useState<TradeFormData>({
     asset: '',
@@ -268,6 +287,27 @@ export const TradeForm: React.FC<TradeFormProps> = ({
     }
   }, [formData.positionSize, formData.entryDate, formData.asset, trade, trades, settings]);
 
+  // Analyze historical context when enough data is available
+  useEffect(() => {
+    if (!trade && hasEnoughContextData(formData)) {
+      // Get contextual suggestions
+      const suggestions = getContextualSuggestions(formData, trades, 5);
+      // Filter out dismissed suggestions
+      const activeSuggestions = suggestions.filter(s => {
+        const key = `${s.type}_${s.suggestedValue || ''}`;
+        return !dismissedSuggestions.has(key);
+      });
+      setContextualSuggestions(activeSuggestions);
+
+      // Get historical warnings
+      const warnings = getHistoricalWarnings(formData, trades);
+      setHistoricalWarnings(warnings);
+    } else {
+      setContextualSuggestions([]);
+      setHistoricalWarnings([]);
+    }
+  }, [formData.asset, formData.entryDate, formData.entryPrice, formData.stopLoss, formData.takeProfit, trades, trade, dismissedSuggestions]);
+
   // Calculate swap automatically for forex trades
   useEffect(() => {
     if (isForexPair(formData.asset) && formData.swapRate && formData.entryDate && formData.exitDate) {
@@ -336,6 +376,17 @@ export const TradeForm: React.FC<TradeFormProps> = ({
     }
     
     if (validate()) {
+      // Check for similar trades before submitting (only for new trades)
+      if (!trade && hasEnoughContextData(formData)) {
+        const similar = findSimilarTrades(formData, trades, 3);
+        if (similar.length > 0) {
+          setSimilarTrades(similar);
+          setShowSimilarTradeModal(true);
+          return; // Don't submit yet, wait for user decision
+        }
+      }
+      
+      // Submit trade
       onSubmit({
         ...formData,
         entryDate: new Date(formData.entryDate).toISOString(),
@@ -348,8 +399,47 @@ export const TradeForm: React.FC<TradeFormProps> = ({
     }
   };
 
+  const handleContinueWithoutReview = () => {
+    setShowSimilarTradeModal(false);
+    // Submit trade
+    onSubmit({
+      ...formData,
+      entryDate: new Date(formData.entryDate).toISOString(),
+      exitDate: formData.exitDate ? new Date(formData.exitDate).toISOString() : null,
+      screenshots: formData.screenshots,
+      videos: formData.videos,
+      tags: formData.tags,
+      journal: formData.journal,
+    });
+  };
+
+  const handleApplySuggestion = (suggestion: ContextualSuggestion) => {
+    if (suggestion.type === 'strategy' && suggestion.suggestedValue) {
+      setFormData(prev => ({ ...prev, setupId: suggestion.suggestedValue }));
+    } else if (suggestion.type === 'tag' && suggestion.suggestedValue) {
+      setFormData(prev => ({
+        ...prev,
+        tags: prev.tags.includes(suggestion.suggestedValue!)
+          ? prev.tags
+          : [...prev.tags, suggestion.suggestedValue!],
+      }));
+    } else if (suggestion.type === 'session' && suggestion.suggestedValue) {
+      setFormData(prev => ({ ...prev, session: suggestion.suggestedValue as TradingSession }));
+    }
+    
+    // Mark as dismissed to avoid showing again
+    const key = `${suggestion.type}_${suggestion.suggestedValue || ''}`;
+    setDismissedSuggestions(prev => new Set(prev).add(key));
+  };
+
+  const handleDismissSuggestion = (suggestion: ContextualSuggestion) => {
+    const key = `${suggestion.type}_${suggestion.suggestedValue || ''}`;
+    setDismissedSuggestions(prev => new Set(prev).add(key));
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <>
+      <form onSubmit={handleSubmit} className="space-y-4">
       {/* Rule Warnings and Errors */}
       {ruleViolations.length > 0 && !trade && (
         <div className={`p-3 border rounded-md ${
@@ -378,6 +468,24 @@ export const TradeForm: React.FC<TradeFormProps> = ({
               </ul>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Contextual Suggestions - Only show if enough data and not dismissed */}
+      {contextualSuggestions.length > 0 && (
+        <div className="mb-4">
+          <ContextualSuggestions
+            suggestions={contextualSuggestions}
+            onApply={handleApplySuggestion}
+            onDismiss={handleDismissSuggestion}
+          />
+        </div>
+      )}
+
+      {/* Historical Warnings - Only show if there are warnings */}
+      {historicalWarnings.length > 0 && (
+        <div className="mb-4">
+          <HistoricalWarnings warnings={historicalWarnings} />
         </div>
       )}
       
@@ -759,6 +867,22 @@ export const TradeForm: React.FC<TradeFormProps> = ({
         </Button>
       </div>
     </form>
+
+    {/* Similar Trade Modal */}
+      <SimilarTradeModal
+        isOpen={showSimilarTradeModal}
+        similarTrades={similarTrades}
+        onViewTrade={(tradeId) => {
+          if (onViewTrade) {
+            onViewTrade(tradeId);
+          } else {
+            setShowSimilarTradeModal(false);
+          }
+        }}
+        onContinue={handleContinueWithoutReview}
+        onClose={() => setShowSimilarTradeModal(false)}
+      />
+    </>
   );
 };
 
