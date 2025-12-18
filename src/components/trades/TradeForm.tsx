@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
@@ -20,12 +20,21 @@ import { isForexPair, calculateSwap } from '@/lib/forexCalculations';
 
 interface TradeFormProps {
   trade?: Trade | null;
-  initialFormData?: TradeFormData;
+  initialFormData?: TradeFormData | Partial<TradeFormData>;
   onSubmit: (data: TradeFormData) => void;
   onCancel: () => void;
+  autoDetectedFields?: string[]; // Fields that were auto-detected from OCR
+  ocrImageBase64?: string; // Base64 image from OCR to include in screenshots
 }
 
-export const TradeForm: React.FC<TradeFormProps> = ({ trade, initialFormData, onSubmit, onCancel }) => {
+export const TradeForm: React.FC<TradeFormProps> = ({ 
+  trade, 
+  initialFormData, 
+  onSubmit, 
+  onCancel,
+  autoDetectedFields = [],
+  ocrImageBase64,
+}) => {
   const { settings } = useSettingsStore();
   const { trades } = useTradeStore();
   const { setups, loadSetups } = useSetupStore();
@@ -111,14 +120,93 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, initialFormData, on
         setupId: trade.setupId,
       });
     } else if (initialFormData) {
-      // Reset entry date to today when using template
-      setFormData({
-        ...initialFormData,
-        entryDate: new Date().toISOString().split('T')[0],
-        exitDate: null,
+      // Merge initial form data (from template or OCR)
+      // Only apply on first load - don't overwrite user edits
+      setFormData(prev => {
+        // Check if form is still in default/empty state (first load)
+        const isFirstLoad = prev.asset === '' && prev.entryPrice === 0 && prev.positionSize === 0;
+        
+        if (isFirstLoad) {
+          // First load: apply all initialFormData
+          return {
+            ...prev,
+            ...initialFormData,
+            // Preserve default journal structure
+            journal: initialFormData.journal || defaultJournal,
+            // Add OCR image to screenshots if provided
+            screenshots: ocrImageBase64 
+              ? [ocrImageBase64, ...(initialFormData.screenshots || [])]
+              : (initialFormData.screenshots || []),
+            // Don't reset entry date if provided in initialFormData
+            entryDate: initialFormData.entryDate || prev.entryDate || new Date().toISOString().split('T')[0],
+          };
+        } else {
+          // User has already edited - only update screenshots if OCR image is new
+          return {
+            ...prev,
+            screenshots: ocrImageBase64 && !prev.screenshots.includes(ocrImageBase64)
+              ? [ocrImageBase64, ...prev.screenshots]
+              : prev.screenshots,
+          };
+        }
       });
     }
-  }, [trade, initialFormData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trade]);
+  
+  // Separate effect for initialFormData - only run once on mount
+  const hasAppliedInitialData = useRef(false);
+  useEffect(() => {
+    if (!trade && initialFormData && !hasAppliedInitialData.current) {
+      setFormData(prev => {
+        // Only apply if form is still in default state
+        const isFirstLoad = prev.asset === '' && prev.entryPrice === 0 && prev.positionSize === 0;
+        if (isFirstLoad) {
+          hasAppliedInitialData.current = true;
+          return {
+            ...prev,
+            ...initialFormData,
+            journal: initialFormData.journal || defaultJournal,
+            screenshots: ocrImageBase64 
+              ? [ocrImageBase64, ...(initialFormData.screenshots || [])]
+              : (initialFormData.screenshots || []),
+            entryDate: initialFormData.entryDate || prev.entryDate || new Date().toISOString().split('T')[0],
+          };
+        }
+        return prev;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Helper to check if a field was auto-detected
+  const isAutoDetected = (fieldName: string): boolean => {
+    return autoDetectedFields.includes(fieldName);
+  };
+
+  // Component for field label with auto-detected indicator
+  const FieldLabel: React.FC<{ htmlFor: string; required?: boolean; children: React.ReactNode }> = ({ 
+    htmlFor, 
+    required, 
+    children 
+  }) => {
+    const autoDetected = isAutoDetected(htmlFor);
+    return (
+      <div className="flex items-center gap-2">
+        <Label htmlFor={htmlFor} className={required ? 'required' : ''}>
+          {children}
+        </Label>
+        {autoDetected && (
+          <span 
+            className="text-xs bg-green-500/20 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full flex items-center gap-1"
+            title="Detectado desde imagen"
+          >
+            ✓ Auto
+          </span>
+        )}
+      </div>
+    );
+  };
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof TradeFormData, string>> = {};
@@ -295,7 +383,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, initialFormData, on
       
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="asset">Activo *</Label>
+          <FieldLabel htmlFor="asset" required>Activo</FieldLabel>
           <Input
             id="asset"
             value={formData.asset}
@@ -308,16 +396,18 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, initialFormData, on
             placeholder="ej: BTC/USD"
             error={!!errors.asset}
             required
+            className={isAutoDetected('asset') ? 'border-green-500/50 bg-green-500/5' : ''}
           />
           {errors.asset && <p className="text-sm text-destructive mt-1">{errors.asset}</p>}
         </div>
 
         <div>
-          <Label htmlFor="positionType">Tipo de Posición *</Label>
+          <FieldLabel htmlFor="positionType" required>Tipo de Posición</FieldLabel>
           <Select
             id="positionType"
             value={formData.positionType}
             onChange={(e) => setFormData({ ...formData, positionType: e.target.value as PositionType })}
+            className={isAutoDetected('positionType') ? 'border-green-500/50 bg-green-500/5' : ''}
           >
             <option value="long">Largo</option>
             <option value="short">Corto</option>
@@ -325,7 +415,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, initialFormData, on
         </div>
 
         <div>
-          <Label htmlFor="entryPrice">Precio de Entrada *</Label>
+          <FieldLabel htmlFor="entryPrice" required>Precio de Entrada</FieldLabel>
           <Input
             id="entryPrice"
             type="number"
@@ -339,6 +429,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, initialFormData, on
             }}
             error={!!errors.entryPrice}
             required
+            className={isAutoDetected('entryPrice') ? 'border-green-500/50 bg-green-500/5' : ''}
           />
           {errors.entryPrice && <p className="text-sm text-destructive mt-1">{errors.entryPrice}</p>}
         </div>
@@ -393,25 +484,27 @@ export const TradeForm: React.FC<TradeFormProps> = ({ trade, initialFormData, on
         </div>
 
         <div>
-          <Label htmlFor="stopLoss">Stop Loss</Label>
+          <FieldLabel htmlFor="stopLoss">Stop Loss</FieldLabel>
           <Input
             id="stopLoss"
             type="number"
             step="0.0001"
             value={formData.stopLoss || ''}
             onChange={(e) => setFormData({ ...formData, stopLoss: e.target.value ? parseFloat(e.target.value) : null })}
+            className={isAutoDetected('stopLoss') ? 'border-green-500/50 bg-green-500/5' : ''}
           />
           {errors.stopLoss && <p className="text-sm text-destructive mt-1">{errors.stopLoss}</p>}
         </div>
 
         <div>
-          <Label htmlFor="takeProfit">Take Profit</Label>
+          <FieldLabel htmlFor="takeProfit">Take Profit</FieldLabel>
           <Input
             id="takeProfit"
             type="number"
             step="0.0001"
             value={formData.takeProfit || ''}
             onChange={(e) => setFormData({ ...formData, takeProfit: e.target.value ? parseFloat(e.target.value) : null })}
+            className={isAutoDetected('takeProfit') ? 'border-green-500/50 bg-green-500/5' : ''}
           />
           {errors.takeProfit && <p className="text-sm text-destructive mt-1">{errors.takeProfit}</p>}
         </div>

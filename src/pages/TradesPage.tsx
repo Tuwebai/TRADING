@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Modal } from '@/components/ui/Modal';
 import { TradeForm } from '@/components/trades/TradeForm';
+import { TradeImageImporter } from '@/components/trades/TradeImageImporter';
 import { TradeTable } from '@/components/trades/TradeTable';
 import { TradeFiltersComponent } from '@/components/trades/TradeFilters';
 import { TradeCategoryChart } from '@/components/trades/TradeCategoryChart';
@@ -56,6 +57,8 @@ export const TradesPage = () => {
   const [closingTrade, setClosingTrade] = useState<Trade | null>(null);
   const [historyTrade, setHistoryTrade] = useState<Trade | null>(null);
   const [currentFormData, setCurrentFormData] = useState<TradeFormData | undefined>(undefined);
+  const [showImageImporter, setShowImageImporter] = useState(false);
+  const [ocrExtractedData, setOcrExtractedData] = useState<{ formData: Partial<TradeFormData>; imageBase64: string; detectedFields: string[] } | null>(null);
 
   const { loadTemplates } = useTemplateStore();
 
@@ -351,9 +354,11 @@ export const TradesPage = () => {
           setIsModalOpen(false);
           setEditingTrade(null);
           setClosingTrade(null);
+          setShowImageImporter(false);
+          setOcrExtractedData(null);
         }}
-        title={closingTrade ? 'Cerrar Operación' : editingTrade ? 'Editar Operación' : 'Agregar Operación'}
-        size={editingTrade ? "xl" : "lg"}
+        title={closingTrade ? 'Cerrar Operación' : editingTrade ? 'Editar Operación' : showImageImporter ? 'Importar desde Imagen' : 'Agregar Operación'}
+        size={editingTrade ? "xl" : showImageImporter ? "lg" : "lg"}
       >
         {closingTrade ? (
           <CloseTradeForm
@@ -364,8 +369,57 @@ export const TradesPage = () => {
               setClosingTrade(null);
             }}
           />
+        ) : showImageImporter ? (
+          <TradeImageImporter
+            onDataExtracted={(formData, imageBase64) => {
+              // Extract detected fields from the formData
+              const detectedFields: string[] = [];
+              if (formData.asset) detectedFields.push('asset');
+              if (formData.positionType) detectedFields.push('positionType');
+              if (formData.entryPrice !== undefined) detectedFields.push('entryPrice');
+              if (formData.stopLoss !== undefined) detectedFields.push('stopLoss');
+              if (formData.takeProfit !== undefined) detectedFields.push('takeProfit');
+              if (formData.exitPrice !== undefined) detectedFields.push('exitPrice');
+              if (formData.entryDate) detectedFields.push('entryDate');
+              if (formData.exitDate) detectedFields.push('exitDate');
+              if (formData.positionSize !== undefined) detectedFields.push('positionSize');
+              if (formData.leverage !== undefined) detectedFields.push('leverage');
+              
+              setOcrExtractedData({ formData, imageBase64, detectedFields });
+              setShowImageImporter(false);
+            }}
+            onCancel={() => {
+              setShowImageImporter(false);
+            }}
+          />
         ) : (
           <>
+            {!editingTrade && (
+              <div className="mb-4 p-4 border rounded-lg bg-muted/50">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowImageImporter(false);
+                      setOcrExtractedData(null);
+                    }}
+                    className="flex-1"
+                  >
+                    ➕ Manual
+                  </Button>
+                  <Button
+                    variant="default"
+                    onClick={() => {
+                      setShowImageImporter(true);
+                      setOcrExtractedData(null);
+                    }}
+                    className="flex-1"
+                  >
+                    📸 Importar desde Imagen
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="mb-4">
               <TemplateSelector
                 onSelectTemplate={handleTemplateSelect}
@@ -374,13 +428,17 @@ export const TradesPage = () => {
             </div>
             <TradeForm
               trade={editingTrade}
-              initialFormData={currentFormData}
+              initialFormData={ocrExtractedData?.formData || currentFormData}
               onSubmit={handleSubmitTrade}
               onCancel={() => {
                 setIsModalOpen(false);
                 setEditingTrade(null);
                 setCurrentFormData(undefined);
+                setOcrExtractedData(null);
+                setShowImageImporter(false);
               }}
+              autoDetectedFields={ocrExtractedData?.detectedFields || []}
+              ocrImageBase64={ocrExtractedData?.imageBase64}
             />
           </>
         )}
