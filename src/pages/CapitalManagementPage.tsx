@@ -45,7 +45,8 @@ interface PositionCalculation {
 
 export const CapitalManagementPage = () => {
   const { settings, loadSettings, updateSettings } = useSettingsStore();
-  const { trades, loadTrades } = useTradeStore();
+  const { getTradesByMode, loadTrades } = useTradeStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
   const [method, setMethod] = useState<CalculationMethod>('risk-reward');
   
   // Capital editable

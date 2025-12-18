@@ -11,7 +11,8 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { useGoalsStore } from '@/store/goalsStore';
 
 export const InsightsPage = () => {
-  const { trades, loadTrades, isLoading } = useTradeStore();
+  const { getTradesByMode, loadTrades, isLoading } = useTradeStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
   const { settings, loadSettings } = useSettingsStore();
   const { goals, loadGoals } = useGoalsStore();
   

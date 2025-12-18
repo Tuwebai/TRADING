@@ -15,7 +15,8 @@ import { motion } from 'framer-motion';
 
 export const SetupsPage = () => {
   const { setups, loadSetups, addSetup, updateSetup, deleteSetup } = useSetupStore();
-  const { trades, loadTrades } = useTradeStore();
+  const { getTradesByMode, loadTrades } = useTradeStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
   const { settings } = useSettingsStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSetup, setEditingSetup] = useState<TradingSetup | null>(null);

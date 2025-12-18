@@ -98,6 +98,8 @@ export interface Trade {
   evaluatedRules?: EvaluatedRule[]; // All rules evaluated for this trade
   violatedRules?: ViolatedRule[]; // Rules that were violated
   tradeClassification?: 'modelo' | 'neutral' | 'error'; // Trade classification
+  // Trading mode
+  mode: 'simulation' | 'demo' | 'live'; // Trading mode when trade was created
 }
 
 /**
@@ -466,6 +468,7 @@ export interface TradeFormData {
   swapType?: 'long' | 'short' | 'both';
   session?: TradingSession;
   setupId?: string;
+  mode?: 'simulation' | 'demo' | 'live'; // Trading mode (optional in form, will be set automatically)
 }
 
 /**

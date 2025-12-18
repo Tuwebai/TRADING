@@ -46,6 +46,8 @@ export const TradesPage = () => {
     selectedTradeId,
     setSelectedTrade,
     getSelectedTrade,
+    getFilteredTrades,
+    getTradesByMode,
   } = useTradeStore();
   
   const { settings, updateSettings } = useSettingsStore();
@@ -68,8 +70,11 @@ export const TradesPage = () => {
     loadTemplates();
   }, [loadTrades, loadGoals, loadTemplates]);
 
-  // Evaluate trades on-demand using hook
-  const evaluatedTrades = useEvaluatedTrades(trades, settings);
+  // Get trades filtered by current mode first
+  const modeFilteredTrades = getTradesByMode();
+  
+  // Evaluate trades on-demand using hook (only evaluate trades in current mode)
+  const evaluatedTrades = useEvaluatedTrades(modeFilteredTrades, settings);
 
   // Atajos de teclado
   useCommonShortcuts({
@@ -224,45 +229,17 @@ export const TradesPage = () => {
     loadTrades(); // Reload to refresh the list
   };
 
-  // Use evaluated trades for filtering and display
-  const baseTrades = evaluatedTrades.length > 0 ? evaluatedTrades : trades;
-  
-  // Apply filters to evaluated trades
-  const filteredTrades = baseTrades.filter(trade => {
-    
-    // Apply all filters (reuse logic from getFilteredTrades)
-    if (filters.dateFrom && trade.entryDate < filters.dateFrom) return false;
-    if (filters.dateTo && trade.entryDate > filters.dateTo) return false;
-    if (filters.asset && trade.asset.toLowerCase() !== filters.asset.toLowerCase()) return false;
-    
-    if (filters.winLoss && filters.winLoss !== 'all') {
-      if (trade.status !== 'closed' || trade.pnl === null) return false;
-      if (filters.winLoss === 'win' && trade.pnl <= 0) return false;
-      if (filters.winLoss === 'loss' && trade.pnl >= 0) return false;
-    }
-    
-    if (filters.status && filters.status !== 'all' && trade.status !== filters.status) return false;
-    if (filters.session && filters.session !== 'all' && trade.session !== filters.session) return false;
-    if (filters.setupId && trade.setupId !== filters.setupId) return false;
-    
-    if (filters.minRiskReward !== null && filters.minRiskReward !== undefined) {
-      if (!trade.riskReward || trade.riskReward < filters.minRiskReward) return false;
-    }
-    
-    if (filters.ruleStatus) {
-      const hasViolations = trade.violatedRules && trade.violatedRules.length > 0;
-      if (filters.ruleStatus === 'compliant' && hasViolations) return false;
-      if (filters.ruleStatus === 'violations' && !hasViolations) return false;
-    }
-    
-    if (filters.classification && filters.classification !== 'all') {
-      if (trade.tradeClassification !== filters.classification) return false;
-    }
-    
-    return true;
+  // Apply filters using getFilteredTrades (which already filters by mode)
+  // Then merge with evaluated trades (which contain rule evaluations)
+  const filteredTradesRaw = getFilteredTrades();
+  const filteredTrades = filteredTradesRaw.map(trade => {
+    // Find evaluated version of this trade (contains rule evaluations)
+    const evaluated = evaluatedTrades.find(et => et.id === trade.id);
+    return evaluated || trade;
   });
   
-  const uniqueAssets = Array.from(new Set(trades.map(t => t.asset))).sort();
+  // Get unique assets from trades in current mode only
+  const uniqueAssets = Array.from(new Set(modeFilteredTrades.map(t => t.asset))).sort();
 
   const blocked = isBlocked(settings);
   
@@ -313,7 +290,7 @@ export const TradesPage = () => {
       )}
 
       {/* Gráfico de distribución de operaciones */}
-      <TradeCategoryChart trades={trades} />
+      <TradeCategoryChart trades={filteredTrades} />
 
       {isLoading ? (
         <SkeletonTable />
@@ -472,7 +449,7 @@ export const TradesPage = () => {
       <ExportImportModal
         isOpen={isExportImportModalOpen}
         onClose={() => setIsExportImportModalOpen(false)}
-        trades={trades}
+        trades={modeFilteredTrades}
         onImportComplete={handleImportComplete}
       />
       </motion.div>

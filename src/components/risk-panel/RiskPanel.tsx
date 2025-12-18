@@ -9,7 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export const RiskPanel: React.FC = () => {
   const { isOpen, open, close } = useRiskPanelStore();
-  const { trades, loadTrades } = useTradeStore();
+  const { getTradesByMode, loadTrades } = useTradeStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
   const { settings, loadSettings } = useSettingsStore();
   
   useEffect(() => {

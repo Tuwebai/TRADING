@@ -7,6 +7,7 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import type { Trade, PositionType, TradeStatus, EmotionType } from '@/types/Trading';
 import { generateId } from './utils';
+import { useTradingModeStore } from '@/store/tradingModeStore';
 
 /**
  * Validation errors
@@ -109,6 +110,9 @@ function parseTradeRow(row: Record<string, any>, rowIndex: number): { trade: Tra
   const createdAt = row['Fecha Creación'] || row['createdAt'] || entryDate || now;
   const updatedAt = row['Fecha Actualización'] || row['updatedAt'] || now;
 
+  // Get current trading mode (default to simulation if not available)
+  const currentMode = useTradingModeStore.getState?.()?.mode || 'simulation';
+
   const trade: Trade = {
     id,
     asset,
@@ -131,6 +135,7 @@ function parseTradeRow(row: Record<string, any>, rowIndex: number): { trade: Tra
     riskReward,
     createdAt: createdAt.includes('T') ? createdAt : `${createdAt}T00:00:00.000Z`,
     updatedAt: updatedAt.includes('T') ? updatedAt : `${updatedAt}T00:00:00.000Z`,
+    mode: (row['Modo'] || row['mode'] || currentMode) as 'simulation' | 'demo' | 'live', // Use current mode or mode from file
   };
 
   return { trade, errors: [] };
@@ -262,8 +267,12 @@ export async function importFromJSON(file: File): Promise<ImportResult> {
               return;
             }
 
+            // Get current trading mode (default to simulation if not available)
+            const currentMode = useTradingModeStore.getState?.()?.mode || 'simulation';
+            
             // Ensure all required fields exist
             const trade: Trade = {
+              mode: (tradeData.mode || currentMode) as 'simulation' | 'demo' | 'live', // Use mode from data or current mode
               id: tradeData.id || generateId(),
               asset: tradeData.asset,
               positionType: tradeData.positionType || 'long',

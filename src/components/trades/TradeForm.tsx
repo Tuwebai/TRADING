@@ -13,6 +13,7 @@ import { AlertTriangle } from 'lucide-react';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTradeStore } from '@/store/tradeStore';
 import { useSetupStore } from '@/store/setupStore';
+import { useTradingMode, useTradingModeStore } from '@/store/tradingModeStore';
 import { checkTradingRules } from '@/lib/tradingRules';
 import type { RuleViolation } from '@/lib/tradingRules';
 import type { TradeFormData, PositionType, Trade, TradeJournal, TradingSession } from '@/types/Trading';
@@ -50,8 +51,9 @@ export const TradeForm: React.FC<TradeFormProps> = ({
   onViewTrade,
 }) => {
   const { settings } = useSettingsStore();
-  const { trades } = useTradeStore();
+  const { trades, getTradesByMode } = useTradeStore();
   const { setups, loadSetups } = useSetupStore();
+  const { mode, getModeBadge } = useTradingMode();
   
   useEffect(() => {
     loadSetups();
@@ -276,7 +278,9 @@ export const TradeForm: React.FC<TradeFormProps> = ({
   // Check rules when form data changes
   useEffect(() => {
     if (!trade) { // Only check for new trades
-      const violations = checkTradingRules(trades, settings, {
+      // Use trades filtered by current mode for rule checking
+      const modeTrades = getTradesByMode();
+      const violations = checkTradingRules(modeTrades, settings, {
         positionSize: formData.positionSize,
         entryDate: formData.entryDate,
         asset: formData.asset,
@@ -285,7 +289,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
     } else {
       setRuleViolations([]);
     }
-  }, [formData.positionSize, formData.entryDate, formData.asset, trade, trades, settings]);
+  }, [formData.positionSize, formData.entryDate, formData.asset, trade, getTradesByMode, settings]);
 
   // Analyze historical context when enough data is available
   useEffect(() => {
@@ -311,6 +315,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
   // Calculate swap automatically for forex trades
   useEffect(() => {
     if (isForexPair(formData.asset) && formData.swapRate && formData.entryDate && formData.exitDate) {
+      const currentMode = useTradingModeStore.getState().mode;
       const tempTrade: Trade = {
         id: '',
         asset: formData.asset,
@@ -333,6 +338,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
         riskReward: null,
         createdAt: '',
         updatedAt: '',
+        mode: currentMode, // Add trading mode
       };
       
       const calculatedSwap = calculateSwap(
@@ -378,7 +384,8 @@ export const TradeForm: React.FC<TradeFormProps> = ({
     if (validate()) {
       // Check for similar trades before submitting (only for new trades)
       if (!trade && hasEnoughContextData(formData)) {
-        const similar = findSimilarTrades(formData, trades, 3);
+        const modeTrades = getTradesByMode();
+        const similar = findSimilarTrades(formData, modeTrades, 3);
         if (similar.length > 0) {
           setSimilarTrades(similar);
           setShowSimilarTradeModal(true);
@@ -437,9 +444,47 @@ export const TradeForm: React.FC<TradeFormProps> = ({
     setDismissedSuggestions(prev => new Set(prev).add(key));
   };
 
+  const modeBadge = getModeBadge();
+
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Trading Mode Indicator */}
+      <div className={`p-4 border-2 rounded-lg ${modeBadge.bgColor} ${modeBadge.borderColor} ${
+        mode === 'live' ? 'border-red-500/50 bg-red-500/10' :
+        mode === 'demo' ? 'border-yellow-500/50 bg-yellow-500/10' :
+        'border-blue-500/50 bg-blue-500/10'
+      }`}>
+        <div className="flex items-start gap-3">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-medium">Modo activo:</span>
+              <span className={`text-sm font-bold ${modeBadge.color}`}>
+                {modeBadge.label}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Este trade se registrará en modo <strong>{modeBadge.label.toLowerCase()}</strong>
+            </p>
+            {mode === 'live' && (
+              <div className="mt-2 p-2 bg-red-500/20 border border-red-500/30 rounded text-xs text-red-700 dark:text-red-400">
+                <strong>⚠️ Modo LIVE:</strong> Estás registrando trades de cuenta real. Asegúrate de registrar datos precisos y revisar cuidadosamente antes de guardar.
+              </div>
+            )}
+            {mode === 'simulation' && (
+              <div className="mt-2 p-2 bg-blue-500/20 border border-blue-500/30 rounded text-xs text-blue-700 dark:text-blue-400">
+                <strong>ℹ️ Modo SIMULACIÓN:</strong> Puedes registrar trades hipotéticos o de "lo que hubieras hecho". Los datos se mantienen separados de trades reales.
+              </div>
+            )}
+            {mode === 'demo' && (
+              <div className="mt-2 p-2 bg-yellow-500/20 border border-yellow-500/30 rounded text-xs text-yellow-700 dark:text-yellow-400">
+                <strong>🟡 Modo DEMO:</strong> Registrando trades de cuenta demo. Los datos se mantienen separados de modo live y simulación.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Rule Warnings and Errors */}
       {ruleViolations.length > 0 && !trade && (
         <div className={`p-3 border rounded-md ${

@@ -12,7 +12,8 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 
 export const CalendarPage = () => {
-  const { trades, loadTrades, isLoading } = useTradeStore();
+  const { getTradesByMode, loadTrades, isLoading } = useTradeStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
   const { settings, loadSettings } = useSettingsStore();
   const { selectedYear, selectedMonth, nextMonth, prevMonth, goToToday } = useCalendarStore();
   

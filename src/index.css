@@ -98,5 +98,18 @@
       overflow-y: auto;
     }
   }
+
+  /* Trading Mode Styles */
+  .mode-simulation {
+    /* Tonos fríos / neutros para simulación */
+  }
+
+  .mode-demo {
+    /* Warning suave para demo */
+  }
+
+  .mode-live {
+    /* Alerta clara para live - refuerzo visual adicional */
+  }
 }
 

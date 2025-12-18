@@ -242,6 +242,7 @@ export function simulateTradeImpact(
       duringTrade: { marketChanges: '', stopLossAdjustments: '', takeProfitAdjustments: '', emotion: null },
       postTrade: { whatWentWell: '', whatWentWrong: '', lessonsLearned: '', emotion: null },
     },
+    mode: 'simulation', // Default mode for simulation trades
     status: 'open',
     pnl: null,
     riskReward: simulatedTrade.stopLoss && simulatedTrade.takeProfit && simulatedTrade.entryPrice

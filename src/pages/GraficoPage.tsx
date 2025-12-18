@@ -30,7 +30,8 @@ import { shouldBlockTradingDueToGoals } from '@/lib/goalConstraints';
 
 export const GraficoPage = () => {
   const { settings, loadSettings } = useSettingsStore();
-  const { trades, loadTrades } = useTradeStore();
+  const { getTradesByMode, loadTrades } = useTradeStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
   const { goals, loadGoals } = useGoalsStore();
   const navigate = useNavigate();
   

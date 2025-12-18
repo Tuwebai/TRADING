@@ -35,7 +35,8 @@ const typeLabels: Record<GoalType, string> = {
 
 export const GoalsPage = () => {
   const { goals, loadGoals, addGoal, updateGoal, deleteGoal, getGoalsByPeriod, setPrimaryGoal, getPrimaryGoal } = useGoalsStore();
-  const { trades, loadTrades } = useTradeStore();
+  const { getTradesByMode, loadTrades } = useTradeStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
   const { settings, updateSettings } = useSettingsStore();
   const [selectedPeriod, setSelectedPeriod] = useState<GoalPeriod>('daily');
   const [isModalOpen, setIsModalOpen] = useState(false);

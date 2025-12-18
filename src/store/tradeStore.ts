@@ -9,6 +9,7 @@ import { tradeStorage } from '@/lib/storage';
 import { calculatePNL, calculateRR } from '@/lib/calculations';
 import { calculateTradePips, isForexPair, calculateSwap } from '@/lib/forexCalculations';
 import { generateId } from '@/lib/utils';
+import { useTradingModeStore } from './tradingModeStore';
 
 interface TradeStore {
   trades: Trade[];
@@ -18,6 +19,7 @@ interface TradeStore {
   
   // Actions
   loadTrades: () => void;
+  getTradesByMode: (mode?: 'simulation' | 'demo' | 'live') => Trade[]; // Get trades filtered by mode
   addTrade: (formData: TradeFormData) => void;
   updateTrade: (id: string, formData: TradeFormData) => void;
   deleteTrade: (id: string) => void;
@@ -63,6 +65,9 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
         postTrade: { whatWentWell: '', whatWentWrong: '', lessonsLearned: '', emotion: null },
       };
       
+      // Get default mode for trades that don't have one (migration)
+      const defaultMode = useTradingModeStore.getState().mode;
+      
       // Recalculate PnL, R/R, and pips for all trades, and ensure new fields exist
       const updatedTrades = trades.map(trade => {
         const pips = isForexPair(trade.asset) ? calculateTradePips(trade) : null;
@@ -79,6 +84,8 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
           videos: trade.videos || [],
           tags: trade.tags || [],
           journal: trade.journal || defaultJournal,
+          // Assign mode: use existing mode or default to current mode (for old trades)
+          mode: trade.mode || defaultMode,
           pnl: trade.status === 'closed' ? calculatePNL({ ...trade, swap }) : null,
           riskReward: calculateRR(trade),
           pips: pips?.totalPips || null,
@@ -88,7 +95,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
         };
       });
       set({ trades: updatedTrades, isLoading: false });
-      // Save updated calculations and new fields
+      // Save updated calculations and new fields (including mode)
       tradeStorage.saveAll(updatedTrades);
     } catch (error) {
       console.error('Error loading trades:', error);
@@ -96,7 +103,19 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
     }
   },
 
+  getTradesByMode: (mode?: 'simulation' | 'demo' | 'live') => {
+    const { trades } = get();
+    if (!mode) {
+      // If no mode specified, return trades for current mode
+      const currentMode = useTradingModeStore.getState().mode;
+      return trades.filter(t => t.mode === currentMode);
+    }
+    return trades.filter(t => t.mode === mode);
+  },
+
   addTrade: (formData: TradeFormData) => {
+    // Get current trading mode
+    const currentMode = useTradingModeStore.getState().mode;
     const now = new Date().toISOString();
     const defaultJournal = {
       preTrade: { technicalAnalysis: '', marketSentiment: '', entryReasons: '', emotion: null },
@@ -117,6 +136,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       riskReward: null,
       createdAt: now,
       updatedAt: now,
+      mode: currentMode, // Add trading mode
     };
     
     const pips = isForexPair(formData.asset) ? calculateTradePips(tempTrade) : null;
@@ -300,7 +320,11 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
   getFilteredTrades: () => {
     const { trades, filters } = get();
     
-    let filtered = trades.filter(trade => {
+    // First, filter by current trading mode (CRITICAL: isolate data by mode)
+    const currentMode = useTradingModeStore.getState().mode;
+    const modeFilteredTrades = trades.filter(trade => trade.mode === currentMode);
+    
+    let filtered = modeFilteredTrades.filter(trade => {
       // Date filter
       if (filters.dateFrom && trade.entryDate < filters.dateFrom) return false;
       if (filters.dateTo && trade.entryDate > filters.dateTo) return false;

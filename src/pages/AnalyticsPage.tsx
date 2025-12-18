@@ -12,7 +12,8 @@ import { TemporalAnalysis } from '@/components/analytics/TemporalAnalysis';
 import { ChartExportButton } from '@/components/analytics/ChartExportButton';
 
 export const AnalyticsPage = () => {
-  const { trades, loadTrades, isLoading } = useTradeStore();
+  const { getTradesByMode, loadTrades, isLoading } = useTradeStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
   const { settings, loadSettings } = useSettingsStore();
   const [chartLoaded, setChartLoaded] = useState(false);
 

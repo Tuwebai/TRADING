@@ -10,7 +10,8 @@ import { motion } from 'framer-motion';
 import { User, AlertCircle } from 'lucide-react';
 
 export const CareerPage = () => {
-  const { trades, loadTrades, isLoading } = useTradeStore();
+  const { getTradesByMode, loadTrades, isLoading } = useTradeStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
   const { settings, loadSettings } = useSettingsStore();
   
   useEffect(() => {

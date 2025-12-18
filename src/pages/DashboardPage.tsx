@@ -23,7 +23,8 @@ import { shouldBlockTradingDueToGoals } from '@/lib/goalConstraints';
 import type { Trade } from '@/types/Trading';
 
 export const DashboardPage = () => {
-  const { trades, loadTrades, isLoading, deleteTrade, duplicateTrade } = useTradeStore();
+  const { getTradesByMode, loadTrades, isLoading, deleteTrade, duplicateTrade } = useTradeStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
   const { settings, loadSettings } = useSettingsStore();
   const { goals, loadGoals, getPrimaryGoal } = useGoalsStore();
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);

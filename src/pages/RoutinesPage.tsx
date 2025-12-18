@@ -82,7 +82,8 @@ export const RoutinesPage = () => {
   } = useRoutineStore();
 
   const { settings } = useSettingsStore();
-  const { trades } = useTradeStore();
+  const { getTradesByMode } = useTradeStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
 
   const [skipReason, setSkipReason] = useState<Record<RoutineType, string>>({
     morning: '',

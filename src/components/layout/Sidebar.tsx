@@ -52,8 +52,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileToggle }
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuthStore();
-  const { trades } = useTradeStore();
+  const { getTradesByMode } = useTradeStore();
   const { settings } = useSettingsStore();
+  const trades = getTradesByMode(); // Get trades filtered by current mode
 
   // Calcular indicadores de estado
   const getStatusIndicator = (href: string): string | null => {
