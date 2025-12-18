@@ -47,39 +47,50 @@ export function evaluateGoals(
       const today = new Date().toISOString().split('T')[0];
       const existingInsights = goalInsightsStorage.getByGoalId(goal.id);
       const hasInsightToday = existingInsights.some((insight: any) => {
+        if (!insight.generatedAt) return false;
         const insightDate = new Date(insight.generatedAt).toISOString().split('T')[0];
         return insightDate === today;
       });
 
+      // Double check: verify in all insights (not just by goalId) to be extra safe
       if (!hasInsightToday) {
-        const insight = generateGoalFailureInsight(goal, trades, settings);
-        if (insight) {
-          // Store insight
-          goalInsightsStorage.add(insight);
-          
-          // Update goal with insight ID and increment failure count
-          const insightIds = goal.generatedInsightIds || [];
-          if (!insightIds.includes(insight.id)) {
-            updateGoal(goal.id, {
-              generatedInsightIds: [...insightIds, insight.id],
-              failureCount: (goal.failureCount || 0) + 1,
-              failedAt: new Date().toISOString(),
-              lastFailedAt: new Date().toISOString(),
+        const allInsights = goalInsightsStorage.getAll();
+        const stillHasToday = allInsights.some((insight: any) => {
+          if (insight.goalId !== goal.id || !insight.generatedAt) return false;
+          const insightDate = new Date(insight.generatedAt).toISOString().split('T')[0];
+          return insightDate === today;
+        });
+
+        if (!stillHasToday) {
+          const insight = generateGoalFailureInsight(goal, trades, settings);
+          if (insight) {
+            // Store insight (storage.add will also check for duplicates)
+            goalInsightsStorage.add(insight);
+            
+            // Update goal with insight ID and increment failure count
+            const insightIds = goal.generatedInsightIds || [];
+            if (!insightIds.includes(insight.id)) {
+              updateGoal(goal.id, {
+                generatedInsightIds: [...insightIds, insight.id],
+                failureCount: (goal.failureCount || 0) + 1,
+                failedAt: new Date().toISOString(),
+                lastFailedAt: new Date().toISOString(),
+              });
+            }
+
+            // Generate post-mortem if this is a critical failure or binding goal
+            // Check if we already have a post-mortem for this goal today
+            const existingPostMortems = goalPostMortemsStorage.getByGoalId(goal.id);
+            const hasPostMortemToday = existingPostMortems.some((pm: any) => {
+              const pmDate = new Date(pm.failedAt).toISOString().split('T')[0];
+              return pmDate === today;
             });
-          }
 
-          // Generate post-mortem if this is a critical failure or binding goal
-          // Check if we already have a post-mortem for this goal today
-          const existingPostMortems = goalPostMortemsStorage.getByGoalId(goal.id);
-          const hasPostMortemToday = existingPostMortems.some((pm: any) => {
-            const pmDate = new Date(pm.failedAt).toISOString().split('T')[0];
-            return pmDate === today;
-          });
-
-          if (!hasPostMortemToday && (goal.isBinding || (goal.failureCount && goal.failureCount > 2))) {
-            const postMortem = generateGoalPostMortem(goal, trades, settings);
-            if (postMortem) {
-              goalPostMortemsStorage.add(postMortem);
+            if (!hasPostMortemToday && (goal.isBinding || ((goal.failureCount || 0) + 1 > 2))) {
+              const postMortem = generateGoalPostMortem(goal, trades, settings);
+              if (postMortem) {
+                goalPostMortemsStorage.add(postMortem);
+              }
             }
           }
         }

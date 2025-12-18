@@ -8,10 +8,12 @@ import { TimingHeatmap } from '@/components/insights/TimingHeatmap';
 import { motion } from 'framer-motion';
 import { Brain, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
+import { useGoalsStore } from '@/store/goalsStore';
 
 export const InsightsPage = () => {
   const { trades, loadTrades, isLoading } = useTradeStore();
   const { settings, loadSettings } = useSettingsStore();
+  const { goals, loadGoals } = useGoalsStore();
   
   useEffect(() => {
     loadTrades();

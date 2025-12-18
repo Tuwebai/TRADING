@@ -559,10 +559,32 @@ export const goalInsightsStorage = {
   },
 
   /**
-   * Add a new goal insight
+   * Add a new goal insight (prevents duplicates)
    */
-  add(insight: { id: string; goalId: string; [key: string]: any }): void {
+  add(insight: { id: string; goalId: string; generatedAt?: string; [key: string]: any }): void {
     const insights = this.getAll();
+    
+    // Check for duplicates: same goalId and same date
+    if (insight.generatedAt) {
+      const insightDate = new Date(insight.generatedAt).toISOString().split('T')[0];
+      const isDuplicate = insights.some((existing: any) => {
+        if (existing.goalId !== insight.goalId) return false;
+        const existingDate = new Date(existing.generatedAt || existing.createdAt || 0).toISOString().split('T')[0];
+        return existingDate === insightDate;
+      });
+      
+      if (isDuplicate) {
+        // Don't add duplicate
+        return;
+      }
+    }
+    
+    // Check for duplicate by ID (shouldn't happen but just in case)
+    const existsById = insights.some((existing: any) => existing.id === insight.id);
+    if (existsById) {
+      return;
+    }
+    
     insights.push(insight);
     this.saveAll(insights);
   },
@@ -597,10 +619,30 @@ export const goalPostMortemsStorage = {
   },
 
   /**
-   * Add a new post-mortem
+   * Add a new post-mortem (prevents duplicates)
    */
   add(postMortem: GoalPostMortem): void {
     const postMortems = this.getAll();
+    
+    // Check for duplicates: same goalId and same date
+    const postMortemDate = new Date(postMortem.failedAt).toISOString().split('T')[0];
+    const isDuplicate = postMortems.some((existing: GoalPostMortem) => {
+      if (existing.goalId !== postMortem.goalId) return false;
+      const existingDate = new Date(existing.failedAt).toISOString().split('T')[0];
+      return existingDate === postMortemDate;
+    });
+    
+    if (isDuplicate) {
+      // Don't add duplicate
+      return;
+    }
+    
+    // Check for duplicate by ID (shouldn't happen but just in case)
+    const existsById = postMortems.some((existing: GoalPostMortem) => existing.id === postMortem.id);
+    if (existsById) {
+      return;
+    }
+    
     postMortems.push(postMortem);
     this.saveAll(postMortems);
   },

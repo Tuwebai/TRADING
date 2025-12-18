@@ -401,29 +401,42 @@ export function getPriorityInsights(trades: Trade[], settings: Settings): Proact
   const allInsights = generateProactiveInsights(trades, settings);
   
   // Agregar insights generados por objetivos (evitar duplicados)
+  // NOTA: El filtrado por objetivos activos se hace en InsightsPage.tsx
+  // para evitar dependencias circulares
   try {
     const goalInsights = goalInsightsStorage.getAll();
-    const today = new Date().toISOString().split('T')[0];
-    const seenGoalIds = new Set<string>();
+    const seenKeys = new Set<string>(); // goalId + date
     
     const recentGoalInsights = goalInsights
       .filter((gi: any) => {
+        if (!gi.generatedAt) return false;
+        
         const generatedAt = new Date(gi.generatedAt);
         const daysSince = (Date.now() - generatedAt.getTime()) / (1000 * 60 * 60 * 24);
         const insightDate = generatedAt.toISOString().split('T')[0];
+        const uniqueKey = `${gi.goalId}_${insightDate}`;
         
         // Solo insights de los últimos 7 días
         if (daysSince > 7) return false;
         
         // Solo un insight por objetivo por día (evitar duplicados)
-        if (insightDate === today && seenGoalIds.has(gi.goalId)) {
+        if (seenKeys.has(uniqueKey)) {
           return false;
         }
         
-        seenGoalIds.add(gi.goalId);
+        seenKeys.add(uniqueKey);
         return true;
       })
-      .map((gi: any) => goalInsightToProactiveInsight(gi));
+      .sort((a: any, b: any) => {
+        // Mostrar el más reciente primero
+        return new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime();
+      })
+      .map((gi: any) => {
+        const proactiveInsight = goalInsightToProactiveInsight(gi);
+        // Agregar goalId a data para poder filtrar después
+        proactiveInsight.data = { ...proactiveInsight.data, goalId: gi.goalId };
+        return proactiveInsight;
+      });
     
     allInsights.push(...recentGoalInsights);
   } catch (error) {
