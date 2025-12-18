@@ -36,6 +36,7 @@ export const useTradingModeStore = create<TradingModeState>()(
 
       setMode: (mode: TradingMode, confirmed = false) => {
         // Always set the mode (confirmation is handled by UI)
+        void confirmed; // Parameter kept for API compatibility, confirmation handled by UI component
         set({ mode });
       },
 
