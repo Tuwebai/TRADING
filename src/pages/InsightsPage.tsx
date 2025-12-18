@@ -18,9 +18,30 @@ export const InsightsPage = () => {
   useEffect(() => {
     loadTrades();
     loadSettings();
-  }, [loadTrades, loadSettings]);
+    loadGoals();
+  }, [loadTrades, loadSettings, loadGoals]);
   
-  const priorityInsights = getPriorityInsights(trades, settings);
+  // Filtrar insights para solo mostrar los de objetivos activos
+  const activeGoalIds = new Set(
+    goals
+      .filter(g => {
+        const now = new Date();
+        const startDate = new Date(g.startDate);
+        const endDate = new Date(g.endDate);
+        return now >= startDate && now <= endDate && !g.completed;
+      })
+      .map(g => g.id)
+  );
+  
+  const allPriorityInsights = getPriorityInsights(trades, settings);
+  const priorityInsights = allPriorityInsights.filter(insight => {
+    // Si el insight es de un objetivo, verificar que el objetivo esté activo
+    if (insight.data?.goalId) {
+      return activeGoalIds.has(insight.data.goalId);
+    }
+    // Si no es de un objetivo, siempre mostrarlo
+    return true;
+  });
   const hasCriticalInsights = priorityInsights.some(i => i.severity === 'critical');
   const closedTradesCount = trades.filter(t => t.status === 'closed').length;
   
