@@ -16,6 +16,10 @@ export function getTodayDate(): string {
 /**
  * Get today's routine execution or create a new one
  */
+/**
+ * Get today's routine execution (synchronous version - uses localStorage)
+ * For Supabase sync, the routineStore handles synchronization automatically
+ */
 export function getTodayExecution(): DailyRoutineExecution {
   const today = getTodayDate();
   const existing = routineExecutionStorage.getByDate(today);

@@ -6,7 +6,7 @@
 import jsPDF from 'jspdf';
 import type { TradingGoal, Trade, Settings } from '@/types/Trading';
 import { calculateAnalytics } from './calculations';
-import { goalPostMortemsStorage } from './storage';
+import { goalPostMortemsStorage, type GoalPostMortem } from './storage';
 
 const periodLabels: Record<TradingGoal['period'], string> = {
   daily: 'Diario',
@@ -294,5 +294,142 @@ export function exportGoalsToPDF(
 
   // Save PDF
   pdf.save(`reporte_objetivos_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+/**
+ * Export post-mortems report to PDF
+ */
+export function exportPostMortemsToPDF(
+  postMortems: GoalPostMortem[],
+  goals: TradingGoal[]
+): void {
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 20;
+  const contentWidth = pageWidth - 2 * margin;
+  let yPosition = 30;
+
+  // Title
+  pdf.setFontSize(20);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Reporte de Análisis Post-Mortem', margin, yPosition);
+  yPosition += 10;
+
+  // Date
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(128, 128, 128);
+  pdf.text(`Generado el: ${new Date().toLocaleDateString('es-ES')}`, margin, yPosition);
+  pdf.setTextColor(0, 0, 0);
+  yPosition += 15;
+
+  // Summary
+  pdf.setFontSize(14);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Resumen', margin, yPosition);
+  yPosition += 8;
+
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(`Total de post-mortems: ${postMortems.length}`, margin, yPosition);
+  yPosition += 6;
+  pdf.text(`Objetivos únicos analizados: ${new Set(postMortems.map(pm => pm.goalId)).size}`, margin, yPosition);
+  yPosition += 10;
+
+  // Post-Mortems Details
+  if (postMortems.length === 0) {
+    pdf.setFontSize(11);
+    pdf.text('No hay análisis post-mortem disponibles.', margin, yPosition);
+  } else {
+    postMortems.forEach((pm, index) => {
+      if (yPosition > pageHeight - 100) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`${index + 1}. ${pm.goalTitle}`, margin, yPosition);
+      yPosition += 7;
+
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Fecha de falla: ${new Date(pm.failedAt).toLocaleDateString('es-ES')}`, margin, yPosition);
+      yPosition += 6;
+
+      // Goal info
+      const goal = goals.find(g => g.id === pm.goalId);
+      if (goal) {
+        pdf.text(`Objetivo: ${typeLabels[goal.type]} - ${periodLabels[goal.period]}`, margin, yPosition);
+        yPosition += 6;
+        if (goal.isBinding) {
+          pdf.setTextColor(200, 0, 0);
+          pdf.text('Objetivo vinculante con consecuencias', margin, yPosition);
+          pdf.setTextColor(0, 0, 0);
+          yPosition += 6;
+        }
+      }
+
+      // Cause
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Causa Identificada:', margin, yPosition);
+      yPosition += 6;
+      pdf.setFont('helvetica', 'normal');
+      const causeLines = pdf.splitTextToSize(pm.cause, contentWidth - 10);
+      causeLines.forEach((line: string) => {
+        pdf.text(line, margin + 5, yPosition);
+        yPosition += 5;
+      });
+
+      // Rule Violations
+      if (pm.relatedRuleViolations.length > 0) {
+        yPosition += 3;
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Reglas Violadas:', margin, yPosition);
+        yPosition += 6;
+        pdf.setFont('helvetica', 'normal');
+        pm.relatedRuleViolations.forEach((violation) => {
+          pdf.text(`  • ${violation}`, margin + 5, yPosition);
+          yPosition += 5;
+        });
+      }
+
+      // Historical Patterns
+      if (pm.historicalPatterns.length > 0) {
+        yPosition += 3;
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Patrones Históricos:', margin, yPosition);
+        yPosition += 6;
+        pdf.setFont('helvetica', 'normal');
+        pm.historicalPatterns.forEach((pattern) => {
+          const patternLines = pdf.splitTextToSize(`  • ${pattern}`, contentWidth - 10);
+          patternLines.forEach((line: string) => {
+            pdf.text(line, margin + 5, yPosition);
+            yPosition += 5;
+          });
+        });
+      }
+
+      // Notes
+      if (pm.notes) {
+        yPosition += 3;
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Notas Adicionales:', margin, yPosition);
+        yPosition += 6;
+        pdf.setFont('helvetica', 'normal');
+        const notesLines = pdf.splitTextToSize(pm.notes, contentWidth - 10);
+        notesLines.forEach((line: string) => {
+          pdf.text(line, margin + 5, yPosition);
+          yPosition += 5;
+        });
+      }
+
+      yPosition += 10;
+    });
+  }
+
+  // Save PDF
+  pdf.save(`postmortems_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 

@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import type { TradeTemplate, TradeFormData } from '@/types/Trading';
 import { templateStorage } from '@/lib/storage';
+import { storageAdapter } from '@/lib/storageAdapter';
 import { generateId } from '@/lib/utils';
 
 interface TemplateStore {
@@ -13,10 +14,10 @@ interface TemplateStore {
   isLoading: boolean;
   
   // Actions
-  loadTemplates: () => void;
-  addTemplate: (name: string, description: string | undefined, formData: TradeFormData) => void;
-  updateTemplate: (id: string, name: string, description: string | undefined, formData: TradeFormData) => void;
-  deleteTemplate: (id: string) => void;
+  loadTemplates: () => Promise<void>;
+  addTemplate: (name: string, description: string | undefined, formData: TradeFormData) => Promise<void>;
+  updateTemplate: (id: string, name: string, description: string | undefined, formData: TradeFormData) => Promise<void>;
+  deleteTemplate: (id: string) => Promise<void>;
   getTemplate: (id: string) => TradeTemplate | null;
 }
 
@@ -24,18 +25,21 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
   templates: [],
   isLoading: false,
 
-  loadTemplates: () => {
+  loadTemplates: async () => {
     set({ isLoading: true });
     try {
-      const templates = templateStorage.getAll();
+      const templates = await storageAdapter.getAllTemplates();
       set({ templates, isLoading: false });
     } catch (error) {
-      console.error('Error loading templates:', error);
-      set({ isLoading: false });
+      // Solo loggear errores reales, no errores de autenticación
+      if (error instanceof Error && !error.message.includes('no autenticado')) {
+        console.error('Error loading templates:', error);
+      }
+      set({ templates: [], isLoading: false });
     }
   },
 
-  addTemplate: (name: string, description: string | undefined, formData: TradeFormData) => {
+  addTemplate: async (name: string, description: string | undefined, formData: TradeFormData) => {
     const now = new Date().toISOString();
     const newTemplate: TradeTemplate = {
       id: generateId(),
@@ -48,10 +52,10 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
 
     const templates = [...get().templates, newTemplate];
     set({ templates });
-    templateStorage.add(newTemplate);
+    await storageAdapter.saveTemplate(newTemplate);
   },
 
-  updateTemplate: (id: string, name: string, description: string | undefined, formData: TradeFormData) => {
+  updateTemplate: async (id: string, name: string, description: string | undefined, formData: TradeFormData) => {
     const templates = get().templates;
     const templateIndex = templates.findIndex(t => t.id === id);
     
@@ -69,13 +73,13 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
     newTemplates[templateIndex] = updatedTemplate;
     
     set({ templates: newTemplates });
-    templateStorage.update(id, updatedTemplate);
+    await storageAdapter.saveTemplate(updatedTemplate);
   },
 
-  deleteTemplate: (id: string) => {
+  deleteTemplate: async (id: string) => {
     const templates = get().templates.filter(t => t.id !== id);
     set({ templates });
-    templateStorage.delete(id);
+    await storageAdapter.deleteTemplate(id);
   },
 
   getTemplate: (id: string) => {

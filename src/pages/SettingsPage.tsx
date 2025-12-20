@@ -6,6 +6,8 @@ import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { ThemeEditor } from '@/components/settings/ThemeEditor';
 import { AdvancedSettingsComponent } from '@/components/settings/AdvancedSettings';
+import { BrokerAccountsManager } from '@/components/settings/BrokerAccountsManager';
+import { NotificationSettings } from '@/components/notifications/NotificationSettings';
 import { useSettingsStore } from '@/store/settingsStore';
 import type { ThemeName, ThemeConfig } from '@/types/Trading';
 
@@ -127,6 +129,12 @@ export const SettingsPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Gestión de Cuentas de Broker */}
+      <BrokerAccountsManager />
+
+      {/* Configuración de Notificaciones */}
+      <NotificationSettings />
 
       {/* Configuración Avanzada */}
       <AdvancedSettingsComponent

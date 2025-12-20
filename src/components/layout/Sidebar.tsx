@@ -16,6 +16,7 @@ import {
   Lightbulb,
   LogOut,
   Layers,
+  FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -34,6 +35,7 @@ const navigation = [
   { name: 'Setups', href: '/setups', icon: Layers },
   { name: 'Gestión de Capital', href: '/capital', icon: Calculator },
   { name: 'Objetivos', href: '/goals', icon: Target },
+  { name: 'Post-Mortems', href: '/postmortems', icon: FileText },
   { name: 'Rutinas', href: '/routines', icon: CheckSquare },
   { name: 'Análisis', href: '/analytics', icon: BarChart3 },
   { name: 'Gráfico', href: '/grafico', icon: LineChart },

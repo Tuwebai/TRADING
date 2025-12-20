@@ -15,12 +15,14 @@ import { CareerPage } from '@/pages/CareerPage';
 import { InsightsPage } from '@/pages/InsightsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { SetupsPage } from '@/pages/SetupsPage';
+import { PostMortemsPage } from '@/pages/PostMortemsPage';
 import { PrivateRoute } from '@/components/auth/PrivateRoute';
 import { initializeStorage } from '@/lib/storage';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useAuthStore } from '@/store/authStore';
 import { applyTheme } from '@/lib/themes';
 import { PageTransition } from '@/components/ui/PageTransition';
+import { Toaster } from '@/components/ui/Toaster';
 
 function AppRoutes() {
   const location = useLocation();
@@ -142,6 +144,15 @@ function AppRoutes() {
             </Layout>
           </PrivateRoute>
         } />
+        <Route path="/postmortems" element={
+          <PrivateRoute>
+            <Layout>
+              <AnimatePresence mode="wait">
+                <PageTransition key={location.pathname}><PostMortemsPage /></PageTransition>
+              </AnimatePresence>
+            </Layout>
+          </PrivateRoute>
+        } />
         
         {/* Catch all - redirect to landing if not authenticated, otherwise to dashboard */}
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -159,6 +170,9 @@ function App() {
     loadSettings();
     // Check authentication state
     checkAuth();
+    
+    // Initialize risk notifications monitoring
+    // Note: This will be handled by useRiskNotifications hook in components that need it
   }, [loadSettings, checkAuth]);
 
   useEffect(() => {
@@ -176,6 +190,7 @@ function App() {
       }}
     >
       <AppRoutes />
+      <Toaster />
     </BrowserRouter>
   );
 }

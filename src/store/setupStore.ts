@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import type { TradingSetup } from '@/types/Trading';
 import { setupStorage } from '@/lib/storage';
+import { storageAdapter } from '@/lib/storageAdapter';
 import { generateId } from '@/lib/utils';
 import { calculateAnalytics } from '@/lib/calculations';
 import type { Trade } from '@/types/Trading';
@@ -15,30 +16,33 @@ interface SetupStore {
   isLoading: boolean;
   
   // Actions
-  loadSetups: () => void;
-  addSetup: (setup: Omit<TradingSetup, 'id' | 'createdAt' | 'updatedAt' | 'stats'>) => void;
-  updateSetup: (id: string, updates: Partial<TradingSetup>) => void;
-  deleteSetup: (id: string) => void;
+  loadSetups: () => Promise<void>;
+  addSetup: (setup: Omit<TradingSetup, 'id' | 'createdAt' | 'updatedAt' | 'stats'>) => Promise<void>;
+  updateSetup: (id: string, updates: Partial<TradingSetup>) => Promise<void>;
+  deleteSetup: (id: string) => Promise<void>;
   getSetup: (id: string) => TradingSetup | null;
-  updateSetupStats: (id: string, trades: Trade[]) => void;
+  updateSetupStats: (id: string, trades: Trade[]) => Promise<void>;
 }
 
 export const useSetupStore = create<SetupStore>((set, get) => ({
   setups: [],
   isLoading: false,
 
-  loadSetups: () => {
+  loadSetups: async () => {
     set({ isLoading: true });
     try {
-      const setups = setupStorage.getAll();
+      const setups = await storageAdapter.getAllSetups();
       set({ setups, isLoading: false });
     } catch (error) {
-      console.error('Error loading setups:', error);
-      set({ isLoading: false });
+      // Solo loggear errores reales, no errores de autenticación
+      if (error instanceof Error && !error.message.includes('no autenticado')) {
+        console.error('Error loading setups:', error);
+      }
+      set({ setups: [], isLoading: false });
     }
   },
 
-  addSetup: (setupData) => {
+  addSetup: async (setupData) => {
     const now = new Date().toISOString();
     const newSetup: TradingSetup = {
       id: generateId(),
@@ -55,10 +59,10 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
 
     const setups = [...get().setups, newSetup];
     set({ setups });
-    setupStorage.add(newSetup);
+    await storageAdapter.saveSetup(newSetup);
   },
 
-  updateSetup: (id: string, updates: Partial<TradingSetup>) => {
+  updateSetup: async (id: string, updates: Partial<TradingSetup>) => {
     const setups = get().setups;
     const setupIndex = setups.findIndex(s => s.id === id);
     
@@ -74,20 +78,20 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     newSetups[setupIndex] = updatedSetup;
     
     set({ setups: newSetups });
-    setupStorage.update(id, updatedSetup);
+    await storageAdapter.saveSetup(updatedSetup);
   },
 
-  deleteSetup: (id: string) => {
+  deleteSetup: async (id: string) => {
     const setups = get().setups.filter(s => s.id !== id);
     set({ setups });
-    setupStorage.delete(id);
+    await storageAdapter.deleteSetup(id);
   },
 
   getSetup: (id: string) => {
     return get().setups.find(s => s.id === id) || null;
   },
 
-  updateSetupStats: (id: string, trades: Trade[]) => {
+  updateSetupStats: async (id: string, trades: Trade[]) => {
     const setups = get().setups;
     const setup = setups.find(s => s.id === id);
     if (!setup) return;

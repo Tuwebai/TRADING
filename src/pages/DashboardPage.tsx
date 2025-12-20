@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { useTradeStore } from '@/store/tradeStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useGoalsStore } from '@/store/goalsStore';
+import { useRiskNotifications } from '@/hooks/useRiskNotifications';
 import { calculateAnalytics, generateEquityCurve, calculateMaxDrawdown } from '@/lib/calculations';
 import { formatPrice, formatCurrency, formatPercentage } from '@/lib/utils';
 import { getRiskMetrics } from '@/lib/risk';
@@ -28,6 +29,9 @@ export const DashboardPage = () => {
   const { settings, loadSettings } = useSettingsStore();
   const { goals, loadGoals, getPrimaryGoal } = useGoalsStore();
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+
+  // Monitor risk and send notifications
+  useRiskNotifications();
 
   useEffect(() => {
     loadTrades();

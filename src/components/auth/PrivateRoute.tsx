@@ -12,17 +12,24 @@ interface PrivateRouteProps {
 }
 
 export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { isAuthenticated, checkAuth } = useAuthStore();
-  const location = useLocation();
+  const { isAuthenticated, isLoading } = useAuthStore();
 
-  // Check auth state on mount and route changes
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth, location.pathname]);
+  // Only show loading on initial mount, not on every route change
+  // Supabase session is persisted, so we don't need to check on every navigation
+  if (isLoading && !isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Verificando autenticación...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     // Redirect to landing page
-    return <Navigate to="/" state={{ from: location }} replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

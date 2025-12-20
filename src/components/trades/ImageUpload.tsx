@@ -21,22 +21,46 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const validateAndProcessFile = useCallback((file: File): Promise<string> => {
+  const validateAndProcessFile = useCallback(async (file: File): Promise<string> => {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      throw new Error(`${file.name} no es una imagen válida`);
+    }
+
+    // Validate file size
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > maxSizeMB) {
+      throw new Error(`${file.name} es demasiado grande (máx. ${maxSizeMB}MB)`);
+    }
+
+    // Try to upload to Supabase Storage first
+    try {
+      const { getSupabaseUser } = await import('@/lib/supabase');
+      const { uploadFile } = await import('@/lib/supabaseStorageFiles');
+      const user = await getSupabaseUser();
+      
+      if (user?.id) {
+        // Generate unique filename
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 9);
+        const extension = file.name.split('.').pop() || 'jpg';
+        const filename = `screenshot_${timestamp}_${randomStr}.${extension}`;
+        const path = `trades/${filename}`;
+        
+        const { url, error } = await uploadFile(file, path, user.id);
+        
+        if (url && !error) {
+          return url; // Return Supabase Storage URL
+        }
+        // If upload fails, fallback to base64
+        console.warn('Failed to upload to Supabase Storage, using base64 fallback:', error);
+      }
+    } catch (error) {
+      console.warn('Supabase Storage not available, using base64 fallback:', error);
+    }
+
+    // Fallback to base64 for offline/local storage
     return new Promise((resolve, reject) => {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        reject(new Error(`${file.name} no es una imagen válida`));
-        return;
-      }
-
-      // Validate file size
-      const fileSizeMB = file.size / (1024 * 1024);
-      if (fileSizeMB > maxSizeMB) {
-        reject(new Error(`${file.name} es demasiado grande (máx. ${maxSizeMB}MB)`));
-        return;
-      }
-
-      // Read file as base64
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target?.result as string;

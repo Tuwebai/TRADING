@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import type { Settings, AdvancedSettings } from '@/types/Trading';
 import { settingsStorage } from '@/lib/storage';
+import { storageAdapter } from '@/lib/storageAdapter';
 import { applyTheme } from '@/lib/themes';
 
 /**
@@ -96,8 +97,8 @@ interface SettingsStore {
   isLoading: boolean;
   
   // Actions
-  loadSettings: () => void;
-  updateSettings: (updates: Partial<Settings>) => void;
+  loadSettings: () => Promise<void>;
+  updateSettings: (updates: Partial<Settings>) => Promise<void>;
   setTheme: (theme: 'light' | 'dark') => void;
 }
 
@@ -115,21 +116,31 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
   isLoading: false,
 
-  loadSettings: () => {
+  loadSettings: async () => {
     set({ isLoading: true });
     try {
-      const settings = settingsStorage.get();
-      set({ settings, isLoading: false });
-      
-      // Apply theme to document
-      applyTheme(settings.theme, settings.customTheme);
+      const settings = await storageAdapter.getSettings();
+      if (settings) {
+        set({ settings, isLoading: false });
+        // Apply theme to document
+        applyTheme(settings.theme, settings.customTheme);
+      } else {
+        // Si no hay settings (usuario no autenticado), usar defaults silenciosamente
+        const defaultSettings = get().settings;
+        set({ settings: defaultSettings, isLoading: false });
+      }
     } catch (error) {
-      console.error('Error loading settings:', error);
-      set({ isLoading: false });
+      // Solo loggear errores reales, no errores de autenticación
+      if (error instanceof Error && !error.message.includes('no autenticado')) {
+        console.error('Error loading settings:', error);
+      }
+      // Usar defaults si hay error
+      const defaultSettings = get().settings;
+      set({ settings: defaultSettings, isLoading: false });
     }
   },
 
-  updateSettings: (updates: Partial<Settings>) => {
+  updateSettings: async (updates: Partial<Settings>) => {
     const currentSettings = get().settings;
     
     // If advanced settings are provided, use them directly (component always sends complete object)
@@ -151,7 +162,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     
     // Save to storage immediately
     set({ settings: newSettings });
-    settingsStorage.save(newSettings);
+    await storageAdapter.saveSettings(newSettings);
     
     // Apply theme if changed
     if (updates.theme !== undefined || updates.customTheme !== undefined) {

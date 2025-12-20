@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import type { TradingGoal, GoalPeriod, GoalType } from '@/types/Trading';
 import { generateId } from '@/lib/utils';
+import { storageAdapter } from '@/lib/storageAdapter';
 
 // Helper to get date range for period
 const getDateRange = (period: GoalPeriod): { start: string; end: string } => {
@@ -48,7 +49,7 @@ interface GoalsStore {
   isLoading: boolean;
   
   // Actions
-  loadGoals: () => void;
+  loadGoals: () => Promise<void>;
   addGoal: (
     period: GoalPeriod,
     type: GoalType,
@@ -60,12 +61,12 @@ interface GoalsStore {
       constraintConfig?: TradingGoal['constraintConfig'];
       consequences?: TradingGoal['consequences'];
     }
-  ) => void;
-  updateGoal: (id: string, updates: Partial<TradingGoal>) => void;
-  deleteGoal: (id: string) => void;
+  ) => Promise<void>;
+  updateGoal: (id: string, updates: Partial<TradingGoal>) => Promise<void>;
+  deleteGoal: (id: string) => Promise<void>;
   getGoalsByPeriod: (period: GoalPeriod) => TradingGoal[];
-  updateGoalProgress: (goalId: string, current: number) => void;
-  setPrimaryGoal: (goalId: string | null) => void;
+  updateGoalProgress: (goalId: string, current: number) => Promise<void>;
+  setPrimaryGoal: (goalId: string | null) => Promise<void>;
   getPrimaryGoal: () => TradingGoal | null;
 }
 
@@ -73,20 +74,22 @@ export const useGoalsStore = create<GoalsStore>((set, get) => ({
   goals: [],
   isLoading: false,
 
-  loadGoals: () => {
+  loadGoals: async () => {
     set({ isLoading: true });
     try {
-      // Load from localStorage
-      const stored = localStorage.getItem('trading_log_goals');
-      const goals = stored ? JSON.parse(stored) : [];
+      // Load from Supabase ONLY
+      const goals = await storageAdapter.getAllGoals();
       set({ goals, isLoading: false });
     } catch (error) {
-      console.error('Error loading goals:', error);
-      set({ isLoading: false });
+      // Solo loggear errores reales, no errores de autenticación
+      if (error instanceof Error && !error.message.includes('no autenticado')) {
+        console.error('Error loading goals:', error);
+      }
+      set({ goals: [], isLoading: false });
     }
   },
 
-  addGoal: (
+  addGoal: async (
     period: GoalPeriod,
     type: GoalType,
     target: number,
@@ -133,43 +136,51 @@ export const useGoalsStore = create<GoalsStore>((set, get) => ({
 
     const updatedGoals = [...goals, newGoal];
     set({ goals: updatedGoals });
-    localStorage.setItem('trading_log_goals', JSON.stringify(updatedGoals));
+    await storageAdapter.saveGoal(newGoal);
   },
 
-  setPrimaryGoal: (goalId: string | null) => {
+  setPrimaryGoal: async (goalId: string | null) => {
     const goals = get().goals.map(goal => ({
       ...goal,
       isPrimary: goal.id === goalId,
     }));
     set({ goals });
-    localStorage.setItem('trading_log_goals', JSON.stringify(goals));
+    // Save all goals that changed
+    for (const goal of goals) {
+      if (goal.isPrimary !== (goal.id === goalId)) {
+        await storageAdapter.saveGoal(goal);
+      }
+    }
   },
 
   getPrimaryGoal: () => {
     return get().goals.find(g => g.isPrimary) || null;
   },
 
-  updateGoal: (id: string, updates: Partial<TradingGoal>) => {
+  updateGoal: async (id: string, updates: Partial<TradingGoal>) => {
     const goals = get().goals.map(goal =>
       goal.id === id
         ? { ...goal, ...updates, updatedAt: new Date().toISOString() }
         : goal
     );
     set({ goals });
-    localStorage.setItem('trading_log_goals', JSON.stringify(goals));
+    const updatedGoal = goals.find(g => g.id === id);
+    if (updatedGoal) {
+      await storageAdapter.saveGoal(updatedGoal);
+    }
   },
 
-  deleteGoal: (id: string) => {
+  deleteGoal: async (id: string) => {
     const goals = get().goals.filter(goal => goal.id !== id);
     set({ goals });
-    localStorage.setItem('trading_log_goals', JSON.stringify(goals));
+    await storageAdapter.deleteGoal(id);
   },
 
   getGoalsByPeriod: (period: GoalPeriod) => {
     return get().goals.filter(goal => goal.period === period);
   },
 
-  updateGoalProgress: (goalId: string, current: number) => {
+  updateGoalProgress: async (goalId: string, current: number) => {
     const goals = get().goals.map(goal => {
       if (goal.id === goalId) {
         const completed = current >= goal.target;
@@ -183,7 +194,10 @@ export const useGoalsStore = create<GoalsStore>((set, get) => ({
       return goal;
     });
     set({ goals });
-    localStorage.setItem('trading_log_goals', JSON.stringify(goals));
+    const updatedGoal = goals.find(g => g.id === goalId);
+    if (updatedGoal) {
+      await storageAdapter.saveGoal(updatedGoal);
+    }
   },
 }));
 

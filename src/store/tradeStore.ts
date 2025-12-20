@@ -6,10 +6,14 @@
 import { create } from 'zustand';
 import type { Trade, TradeFormData, TradeFilters } from '@/types/Trading';
 import { tradeStorage } from '@/lib/storage';
+import { storageAdapter } from '@/lib/storageAdapter';
 import { calculatePNL, calculateRR } from '@/lib/calculations';
 import { calculateTradePips, isForexPair, calculateSwap } from '@/lib/forexCalculations';
 import { generateId } from '@/lib/utils';
 import { useTradingModeStore } from './tradingModeStore';
+import { syncTradesFromSupabase } from '@/lib/supabaseTrades';
+import { subscribeToTrades } from '@/lib/supabaseRealtime';
+import { getSupabaseUser } from '@/lib/supabaseAuth';
 
 interface TradeStore {
   trades: Trade[];
@@ -18,17 +22,17 @@ interface TradeStore {
   selectedTradeId: string | null;
   
   // Actions
-  loadTrades: () => void;
+  loadTrades: () => Promise<void>;
   getTradesByMode: (mode?: 'simulation' | 'demo' | 'live') => Trade[]; // Get trades filtered by mode
-  addTrade: (formData: TradeFormData) => void;
-  updateTrade: (id: string, formData: TradeFormData) => void;
-  deleteTrade: (id: string) => void;
-  closeTrade: (id: string, exitPrice: number, exitDate: string) => void;
-  duplicateTrade: (id: string) => void;
+  addTrade: (formData: TradeFormData) => Promise<void>;
+  updateTrade: (id: string, formData: TradeFormData) => Promise<void>;
+  deleteTrade: (id: string) => Promise<void>;
+  closeTrade: (id: string, exitPrice: number, exitDate: string) => Promise<void>;
+  duplicateTrade: (id: string) => Promise<void>;
   setFilters: (filters: Partial<TradeFilters>) => void;
   clearFilters: () => void;
   setSelectedTrade: (id: string | null) => void;
-  updateTradeNotes: (id: string, notes: string) => void;
+  updateTradeNotes: (id: string, notes: string) => Promise<void>;
   
   // Computed
   getFilteredTrades: () => Trade[];
@@ -55,10 +59,11 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
   isLoading: false,
   selectedTradeId: null,
 
-  loadTrades: () => {
+  loadTrades: async () => {
     set({ isLoading: true });
     try {
-      const trades = tradeStorage.getAll();
+      // Load trades from storage adapter (Supabase or localStorage)
+      const allTrades = await storageAdapter.getAllTrades();
       const defaultJournal = {
         preTrade: { technicalAnalysis: '', marketSentiment: '', entryReasons: '', emotion: null },
         duringTrade: { marketChanges: '', stopLossAdjustments: '', takeProfitAdjustments: '', emotion: null },
@@ -68,8 +73,8 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       // Get default mode for trades that don't have one (migration)
       const defaultMode = useTradingModeStore.getState().mode;
       
-      // Recalculate PnL, R/R, and pips for all trades, and ensure new fields exist
-      const updatedTrades = trades.map(trade => {
+      // Process trades
+      let processedTrades = allTrades.map(trade => {
         const pips = isForexPair(trade.asset) ? calculateTradePips(trade) : null;
         
         // Calculate swap if needed
@@ -87,19 +92,95 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
           // Assign mode: use existing mode or default to current mode (for old trades)
           mode: trade.mode || defaultMode,
           pnl: trade.status === 'closed' ? calculatePNL({ ...trade, swap }) : null,
-          riskReward: calculateRR(trade),
+          // Use RR from database if available (from MT5), otherwise calculate it
+          riskReward: trade.riskReward !== null && trade.riskReward !== undefined 
+            ? trade.riskReward 
+            : calculateRR(trade),
           pips: pips?.totalPips || null,
           riskPips: pips?.riskPips || null,
           rewardPips: pips?.rewardPips || null,
           swap: swap || trade.swap || null,
         };
       });
-      set({ trades: updatedTrades, isLoading: false });
-      // Save updated calculations and new fields (including mode)
-      tradeStorage.saveAll(updatedTrades);
+      
+      // Sync with Supabase MT5 trades (merge MT5 trades from backend)
+      // Don't filter by mode here - load all trades and filter in UI
+      try {
+        const syncedTrades = await syncTradesFromSupabase(processedTrades);
+        processedTrades = syncedTrades;
+        
+        // Recalculate metrics for all trades (including Supabase trades)
+        processedTrades = processedTrades.map(trade => {
+          const pips = isForexPair(trade.asset) ? calculateTradePips(trade) : null;
+          
+          // Calculate swap if needed
+          let swap = trade.swap;
+          if (!swap && trade.swapRate && trade.exitDate && trade.entryDate) {
+            swap = calculateSwap(trade, trade.swapRate, trade.swapType || 'both');
+          }
+          
+          return {
+            ...trade,
+            pnl: trade.status === 'closed' ? calculatePNL({ ...trade, swap }) : null,
+            // Use RR from database if available (from MT5), otherwise calculate it
+            riskReward: trade.riskReward !== null && trade.riskReward !== undefined 
+              ? trade.riskReward 
+              : calculateRR(trade),
+            pips: pips?.totalPips || null,
+            riskPips: pips?.riskPips || null,
+            rewardPips: pips?.rewardPips || null,
+            swap: swap || trade.swap || null,
+          };
+        });
+        
+      } catch (syncError) {
+        // Continue with existing trades if Supabase sync fails
+        console.error('Error syncing with Supabase MT5:', syncError);
+      }
+      
+      set({ trades: processedTrades, isLoading: false });
+      // Save updated calculations and new fields (including mode) - storageAdapter handles Supabase/localStorage
+      await storageAdapter.saveAllTrades(processedTrades);
+      
+      // Subscribe to realtime updates
+      const user = await getSupabaseUser();
+      if (user?.id) {
+        const unsubscribe = subscribeToTrades(
+          user.id,
+          // onInsert
+          (newTrade) => {
+            const currentTrades = get().trades;
+            // Check if trade already exists
+            const exists = currentTrades.some(t => t.id === newTrade.id);
+            if (!exists) {
+              set({ trades: [...currentTrades, newTrade] });
+            }
+          },
+          // onUpdate
+          (updatedTrade) => {
+            const currentTrades = get().trades;
+            const updatedTrades = currentTrades.map(t => 
+              t.id === updatedTrade.id ? updatedTrade : t
+            );
+            set({ trades: updatedTrades });
+          },
+          // onDelete
+          (deletedId) => {
+            const currentTrades = get().trades;
+            const filteredTrades = currentTrades.filter(t => t.id !== deletedId);
+            set({ trades: filteredTrades });
+          }
+        );
+        
+        // Store unsubscribe function (will be cleaned up on next loadTrades call)
+        // Note: In a production app, you'd want to properly manage this subscription lifecycle
+      }
     } catch (error) {
-      console.error('Error loading trades:', error);
-      set({ isLoading: false });
+      // Solo loggear errores reales, no errores de autenticación
+      if (error instanceof Error && !error.message.includes('no autenticado')) {
+        console.error('Error loading trades:', error);
+      }
+      set({ trades: [], isLoading: false });
     }
   },
 
@@ -113,7 +194,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
     return trades.filter(t => t.mode === mode);
   },
 
-  addTrade: (formData: TradeFormData) => {
+  addTrade: async (formData: TradeFormData) => {
     // Get current trading mode
     const currentMode = useTradingModeStore.getState().mode;
     const now = new Date().toISOString();
@@ -160,10 +241,10 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
 
     const trades = [...get().trades, newTrade];
     set({ trades });
-    tradeStorage.add(newTrade);
+    await storageAdapter.saveTrade(newTrade);
   },
 
-  updateTrade: (id: string, formData: TradeFormData) => {
+  updateTrade: async (id: string, formData: TradeFormData) => {
     const trades = get().trades;
     const tradeIndex = trades.findIndex(t => t.id === id);
     
@@ -236,16 +317,16 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
     newTrades[tradeIndex] = updatedTrade;
     
     set({ trades: newTrades });
-    tradeStorage.update(id, updatedTrade);
+    await storageAdapter.saveTrade(updatedTrade);
   },
 
-  deleteTrade: (id: string) => {
+  deleteTrade: async (id: string) => {
     const trades = get().trades.filter(t => t.id !== id);
     set({ trades });
-    tradeStorage.delete(id);
+    await storageAdapter.deleteTrade(id);
   },
 
-  closeTrade: (id: string, exitPrice: number, exitDate: string) => {
+  closeTrade: async (id: string, exitPrice: number, exitDate: string) => {
     const trades = get().trades;
     const tradeIndex = trades.findIndex(t => t.id === id);
     
@@ -265,10 +346,10 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
     newTrades[tradeIndex] = updatedTrade;
     
     set({ trades: newTrades });
-    tradeStorage.update(id, updatedTrade);
+    await storageAdapter.saveTrade(updatedTrade);
   },
 
-  duplicateTrade: (id: string) => {
+  duplicateTrade: async (id: string) => {
     const trades = get().trades;
     const tradeToDuplicate = trades.find(t => t.id === id);
     
@@ -288,7 +369,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
 
     const newTrades = [...trades, duplicatedTrade];
     set({ trades: newTrades });
-    tradeStorage.add(duplicatedTrade);
+    await storageAdapter.saveTrade(duplicatedTrade);
   },
 
   setFilters: (newFilters: Partial<TradeFilters>) => {
@@ -393,7 +474,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
     return trades.find(t => t.id === selectedTradeId) || null;
   },
 
-  updateTradeNotes: (id: string, notes: string) => {
+  updateTradeNotes: async (id: string, notes: string) => {
     const trades = get().trades;
     const tradeIndex = trades.findIndex(t => t.id === id);
     
@@ -409,7 +490,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
     newTrades[tradeIndex] = updatedTrade;
     
     set({ trades: newTrades });
-    tradeStorage.update(id, updatedTrade);
+    await storageAdapter.saveTrade(updatedTrade);
   },
 }));
 

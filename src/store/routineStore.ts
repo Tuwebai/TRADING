@@ -6,8 +6,9 @@
 import { create } from 'zustand';
 import type { Routine, RoutineItem, RoutineType, DailyRoutineExecution, RoutineBlockStatus, PostTradeData } from '@/types/Trading';
 import { routineStorage, routineExecutionStorage } from '@/lib/storage';
+import { storageAdapter } from '@/lib/storageAdapter';
 import { generateId } from '@/lib/utils';
-import { getTodayExecution } from '@/lib/routineDiscipline';
+import { getTodayExecution as getTodayExecutionLocal } from '@/lib/routineDiscipline';
 
 interface RoutineStore {
   routines: Routine[];
@@ -15,22 +16,22 @@ interface RoutineStore {
   isLoading: boolean;
   
   // Actions
-  loadRoutines: () => void;
-  loadDailyExecutions: () => void;
-  getRoutine: (type: RoutineType) => Routine | null;
+  loadRoutines: () => Promise<void>;
+  loadDailyExecutions: () => Promise<void>;
+  getRoutine: (type: RoutineType) => Promise<Routine | null>;
   getTodayExecution: () => DailyRoutineExecution;
-  addRoutineItem: (type: RoutineType, text: string) => void;
-  updateRoutineItem: (type: RoutineType, itemId: string, updates: Partial<RoutineItem>) => void;
-  deleteRoutineItem: (type: RoutineType, itemId: string) => void;
-  toggleRoutineItem: (type: RoutineType, itemId: string) => void;
-  reorderRoutineItems: (type: RoutineType, itemIds: string[]) => void;
+  addRoutineItem: (type: RoutineType, text: string) => Promise<void>;
+  updateRoutineItem: (type: RoutineType, itemId: string, updates: Partial<RoutineItem>) => Promise<void>;
+  deleteRoutineItem: (type: RoutineType, itemId: string) => Promise<void>;
+  toggleRoutineItem: (type: RoutineType, itemId: string) => Promise<void>;
+  reorderRoutineItems: (type: RoutineType, itemIds: string[]) => Promise<void>;
   
   // Daily execution actions
-  markBlockComplete: (type: RoutineType) => void;
-  markBlockSkipped: (type: RoutineType, reason: string) => void;
-  toggleItemCompletion: (type: RoutineType, itemId: string, completed: boolean, note?: string) => void;
-  markEndOfDay: (isValid: boolean, justification?: string) => void;
-  savePostTradeData: (data: PostTradeData) => void;
+  markBlockComplete: (type: RoutineType) => Promise<void>;
+  markBlockSkipped: (type: RoutineType, reason: string) => Promise<void>;
+  toggleItemCompletion: (type: RoutineType, itemId: string, completed: boolean, note?: string) => Promise<void>;
+  markEndOfDay: (isValid: boolean, justification?: string) => Promise<void>;
+  savePostTradeData: (data: PostTradeData) => Promise<void>;
 }
 
 const createDefaultRoutine = (type: RoutineType): Routine => {
@@ -49,27 +50,42 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
   dailyExecutions: [],
   isLoading: false,
 
-  loadRoutines: () => {
+  loadRoutines: async () => {
     set({ isLoading: true });
     try {
-      const routines = routineStorage.getAll();
+      const routines = await storageAdapter.getAllRoutines();
       set({ routines, isLoading: false });
     } catch (error) {
-      console.error('Error loading routines:', error);
-      set({ isLoading: false });
+      // Solo loggear errores reales, no errores de autenticación
+      if (error instanceof Error && !error.message.includes('no autenticado')) {
+        console.error('Error loading routines:', error);
+      }
+      set({ routines: [], isLoading: false });
     }
   },
 
-  loadDailyExecutions: () => {
+  loadDailyExecutions: async () => {
+    set({ isLoading: true });
     try {
-      const executions = routineExecutionStorage.getAll();
-      set({ dailyExecutions: executions });
+      // Load from Supabase
+      const executions = await storageAdapter.getAllRoutineExecutions();
+      set({ dailyExecutions: executions, isLoading: false });
     } catch (error) {
-      console.error('Error loading daily executions:', error);
+      // Solo loggear errores reales, no errores de autenticación
+      if (error instanceof Error && !error.message.includes('no autenticado')) {
+        console.error('Error loading daily executions:', error);
+      }
+      // Fallback to localStorage if Supabase fails
+      try {
+        const localExecutions = routineExecutionStorage.getAll();
+        set({ dailyExecutions: localExecutions, isLoading: false });
+      } catch (localError) {
+        set({ dailyExecutions: [], isLoading: false });
+      }
     }
   },
 
-  getRoutine: (type: RoutineType) => {
+  getRoutine: async (type: RoutineType) => {
     const routines = get().routines;
     let routine = routines.find(r => r.type === type);
     
@@ -78,23 +94,85 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
       routine = createDefaultRoutine(type);
       const newRoutines = [...routines, routine];
       set({ routines: newRoutines });
-      routineStorage.upsert(routine);
+      await storageAdapter.saveRoutine(routine);
     }
     
     return routine;
   },
 
   getTodayExecution: () => {
-    const execution = getTodayExecution();
-    // Sync with store only if it's different
+    // This is now synchronous but loads from store
+    const today = new Date().toISOString().split('T')[0];
+    const executions = get().dailyExecutions;
+    const existing = executions.find(exec => exec.date === today);
+    
+    if (existing) {
+      return existing;
+    }
+    
+    // Create new execution if not found
+    const newExecution = getTodayExecutionLocal();
+    set({ dailyExecutions: [...executions, newExecution] });
+    
+    // Save to Supabase in background
+    storageAdapter.saveRoutineExecution(newExecution).catch(() => {
+      // Fallback to localStorage
+      routineExecutionStorage.save(newExecution);
+    });
+    
+    return newExecution;
+  },
+  
+  // Load today's execution from Supabase (async)
+  loadTodayExecution: async () => {
+    // Try to load from Supabase first, then fallback to localStorage
+    const today = new Date().toISOString().split('T')[0];
+    let execution: DailyRoutineExecution;
+    
+    try {
+      const supabaseExecution = await storageAdapter.getRoutineExecutionByDate(today);
+      if (supabaseExecution) {
+        execution = supabaseExecution;
+      } else {
+        // Fallback to localStorage or create new
+        const localExecution = routineExecutionStorage.getByDate(today);
+        if (localExecution) {
+          execution = localExecution;
+          // Sync to Supabase
+          try {
+            await storageAdapter.saveRoutineExecution(execution);
+          } catch (error) {
+            // Ignore sync errors
+          }
+        } else {
+          execution = getTodayExecutionLocal();
+          // Save to both
+          try {
+            await storageAdapter.saveRoutineExecution(execution);
+          } catch (error) {
+            // Fallback to localStorage
+            routineExecutionStorage.save(execution);
+          }
+        }
+      }
+    } catch (error) {
+      // Fallback to localStorage
+      const localExecution = routineExecutionStorage.getByDate(today);
+      if (localExecution) {
+        execution = localExecution;
+      } else {
+        execution = getTodayExecution();
+        routineExecutionStorage.save(execution);
+      }
+    }
+    
+    // Sync with store
     const executions = get().dailyExecutions;
     const existingIndex = executions.findIndex(exec => exec.date === execution.date);
     
     if (existingIndex === -1) {
-      // Only update if it doesn't exist
       set({ dailyExecutions: [...executions, execution] });
     } else {
-      // Only update if the execution actually changed
       const existing = executions[existingIndex];
       const hasChanged = JSON.stringify(existing) !== JSON.stringify(execution);
       if (hasChanged) {
@@ -106,7 +184,7 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     return execution;
   },
 
-  addRoutineItem: (type: RoutineType, text: string) => {
+  addRoutineItem: async (type: RoutineType, text: string) => {
     const routines = get().routines;
     let routine = routines.find(r => r.type === type);
     
@@ -135,10 +213,10 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
       : [...routines, updatedRoutine];
     
     set({ routines: updatedRoutines });
-    routineStorage.upsert(updatedRoutine);
+    await storageAdapter.saveRoutine(updatedRoutine);
   },
 
-  updateRoutineItem: (type: RoutineType, itemId: string, updates: Partial<RoutineItem>) => {
+  updateRoutineItem: async (type: RoutineType, itemId: string, updates: Partial<RoutineItem>) => {
     const routines = get().routines;
     const routine = routines.find(r => r.type === type);
     
@@ -158,10 +236,10 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     
     const updatedRoutines = routines.map(r => r.type === type ? updatedRoutine : r);
     set({ routines: updatedRoutines });
-    routineStorage.upsert(updatedRoutine);
+    await storageAdapter.saveRoutine(updatedRoutine);
   },
 
-  deleteRoutineItem: (type: RoutineType, itemId: string) => {
+  deleteRoutineItem: async (type: RoutineType, itemId: string) => {
     const routines = get().routines;
     const routine = routines.find(r => r.type === type);
     
@@ -179,10 +257,10 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     
     const updatedRoutines = routines.map(r => r.type === type ? updatedRoutine : r);
     set({ routines: updatedRoutines });
-    routineStorage.upsert(updatedRoutine);
+    await storageAdapter.saveRoutine(updatedRoutine);
   },
 
-  toggleRoutineItem: (type: RoutineType, itemId: string) => {
+  toggleRoutineItem: async (type: RoutineType, itemId: string) => {
     const routines = get().routines;
     const routine = routines.find(r => r.type === type);
     
@@ -214,7 +292,7 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     get().toggleItemCompletion(type, itemId, newCompleted);
   },
 
-  reorderRoutineItems: (type: RoutineType, itemIds: string[]) => {
+  reorderRoutineItems: async (type: RoutineType, itemIds: string[]) => {
     const routines = get().routines;
     const routine = routines.find(r => r.type === type);
     
@@ -239,13 +317,13 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     
     const updatedRoutines = routines.map(r => r.type === type ? updatedRoutine : r);
     set({ routines: updatedRoutines });
-    routineStorage.upsert(updatedRoutine);
+    await storageAdapter.saveRoutine(updatedRoutine);
   },
 
   // Daily execution actions
-  markBlockComplete: (type: RoutineType) => {
+  markBlockComplete: async (type: RoutineType) => {
     const execution = get().getTodayExecution();
-    const routine = get().getRoutine(type);
+    const routine = await get().getRoutine(type);
     
     if (!routine) return;
     
@@ -275,11 +353,17 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
       updatedAt: now,
     };
     
-    routineExecutionStorage.save(updatedExecution);
-    get().loadDailyExecutions();
+    // Save to both Supabase and localStorage (for offline support)
+    try {
+      await storageAdapter.saveRoutineExecution(updatedExecution);
+    } catch (error) {
+      // Fallback to localStorage if Supabase fails
+      routineExecutionStorage.save(updatedExecution);
+    }
+    await get().loadDailyExecutions();
   },
 
-  markBlockSkipped: (type: RoutineType, reason: string) => {
+  markBlockSkipped: async (type: RoutineType, reason: string) => {
     if (!reason.trim()) {
       alert('Debes proporcionar un motivo para saltar esta rutina.');
       return;
@@ -306,13 +390,19 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
       updatedAt: now,
     };
     
-    routineExecutionStorage.save(updatedExecution);
-    get().loadDailyExecutions();
+    // Save to both Supabase and localStorage (for offline support)
+    try {
+      await storageAdapter.saveRoutineExecution(updatedExecution);
+    } catch (error) {
+      // Fallback to localStorage if Supabase fails
+      routineExecutionStorage.save(updatedExecution);
+    }
+    await     await get().loadDailyExecutions();
   },
 
-  toggleItemCompletion: (type: RoutineType, itemId: string, completed: boolean, note?: string) => {
+  toggleItemCompletion: async (type: RoutineType, itemId: string, completed: boolean, note?: string) => {
     const execution = get().getTodayExecution();
-    const routine = get().getRoutine(type);
+    const routine = await get().getRoutine(type);
     
     if (!routine) return;
     
@@ -359,11 +449,17 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
       updatedAt: now,
     };
     
-    routineExecutionStorage.save(updatedExecution);
-    get().loadDailyExecutions();
+    // Save to both Supabase and localStorage (for offline support)
+    try {
+      await storageAdapter.saveRoutineExecution(updatedExecution);
+    } catch (error) {
+      // Fallback to localStorage if Supabase fails
+      routineExecutionStorage.save(updatedExecution);
+    }
+    await get().loadDailyExecutions();
   },
 
-  markEndOfDay: (isValid: boolean, justification?: string) => {
+  markEndOfDay: async (isValid: boolean, justification?: string) => {
     if (!isValid && !justification?.trim()) {
       alert('Debes proporcionar una justificación si el día fue inválido.');
       return;
@@ -383,11 +479,17 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
       updatedAt: now,
     };
     
-    routineExecutionStorage.save(updatedExecution);
+    // Save to both Supabase and localStorage (for offline support)
+    try {
+      await storageAdapter.saveRoutineExecution(updatedExecution);
+    } catch (error) {
+      // Fallback to localStorage if Supabase fails
+      routineExecutionStorage.save(updatedExecution);
+    }
     get().loadDailyExecutions();
   },
 
-  savePostTradeData: (_data: PostTradeData) => {
+  savePostTradeData: async (_data: PostTradeData) => {
     // This would be stored separately or attached to trades
     // For now, we'll store it in the daily execution
     const execution = get().getTodayExecution();
@@ -411,7 +513,13 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
       updatedAt: now,
     };
     
-    routineExecutionStorage.save(updatedExecution);
-    get().loadDailyExecutions();
+    // Save to both Supabase and localStorage (for offline support)
+    try {
+      await storageAdapter.saveRoutineExecution(updatedExecution);
+    } catch (error) {
+      // Fallback to localStorage if Supabase fails
+      routineExecutionStorage.save(updatedExecution);
+    }
+    await get().loadDailyExecutions();
   },
 }));

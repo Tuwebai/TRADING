@@ -65,7 +65,10 @@ export const TradesPage = () => {
   const { loadTemplates } = useTemplateStore();
 
   useEffect(() => {
-    loadTrades();
+    const loadData = async () => {
+      await loadTrades();
+    };
+    loadData();
     loadGoals();
     loadTemplates();
   }, [loadTrades, loadGoals, loadTemplates]);
