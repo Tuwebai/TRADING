@@ -35,7 +35,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 
     // Try to upload to Supabase Storage first
     try {
-      const { getSupabaseUser } = await import('@/lib/supabase');
+      const { getSupabaseUser } = await import('@/lib/supabaseAuth');
       const { uploadFile } = await import('@/lib/supabaseStorageFiles');
       const user = await getSupabaseUser();
       

@@ -31,7 +31,8 @@ function mapToExecution(row: any): DailyRoutineExecution {
       isValid: true,
       justification: null,
     },
-    updatedAt: row.updated_at,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
   };
 }
 

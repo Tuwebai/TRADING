@@ -66,10 +66,10 @@ const emotionOptions: EmotionType[] = [
 
 export const RoutinesPage = () => {
   const {
+    routines,
     dailyExecutions,
     loadRoutines,
     loadDailyExecutions,
-    getRoutine,
     getTodayExecution,
     addRoutineItem,
     deleteRoutineItem,
@@ -79,6 +79,7 @@ export const RoutinesPage = () => {
     toggleItemCompletion,
     markEndOfDay,
     savePostTradeData,
+    getRoutine,
   } = useRoutineStore();
 
   const { settings } = useSettingsStore();
@@ -164,18 +165,18 @@ export const RoutinesPage = () => {
     setSkipReason({ ...skipReason, [type]: '' });
   };
 
-  const handleItemToggle = (type: RoutineType, itemId: string, completed: boolean) => {
-    toggleItemCompletion(type, itemId, completed);
+  const handleItemToggle = async (type: RoutineType, itemId: string, completed: boolean) => {
+    await toggleItemCompletion(type, itemId, completed);
     // Auto-mark block as complete if all items are done
-    const routine = getRoutine(type);
+    const routine = await getRoutine(type);
     if (routine) {
-      const allCompleted = routine.items.every(item => {
+      const allCompleted = routine.items.every((item: { id: string }) => {
         if (item.id === itemId) return completed;
         const execution = todayExecution.blocks[type];
         return execution.itemCompletions[item.id]?.completed || false;
       });
       if (allCompleted && routine.items.length > 0) {
-        markBlockComplete(type);
+        await markBlockComplete(type);
       }
     }
   };
@@ -378,7 +379,7 @@ export const RoutinesPage = () => {
       {/* 1️⃣ RUTINAS CON ESTADO GLOBAL */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {routineTypes.map((type) => {
-          const routine = getRoutine(type);
+          const routine = routines.find(r => r.type === type) || null;
           const blockStatus = getBlockStatus(type);
           const block = todayExecution.blocks[type];
           

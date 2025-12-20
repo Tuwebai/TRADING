@@ -3,9 +3,8 @@
  * Protects routes that require authentication
  */
 
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { useEffect } from 'react';
 
 interface PrivateRouteProps {
   children: React.ReactNode;

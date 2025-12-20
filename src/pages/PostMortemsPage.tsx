@@ -3,16 +3,16 @@
  * Página dedicada para visualizar y gestionar análisis post-mortem de objetivos fallidos
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { useGoalsStore } from '@/store/goalsStore';
 import { goalPostMortemsStorage, type GoalPostMortem } from '@/lib/storage';
-import { formatDate, formatCurrency } from '@/lib/utils';
-import { FileText, Search, Filter, Download, AlertTriangle, Calendar, Target, TrendingDown, XCircle } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import { FileText, Search, Filter, Download, Calendar, Target, TrendingDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { exportPostMortemsToPDF } from '@/lib/goalExport';
 
@@ -143,7 +143,7 @@ export const PostMortemsPage = () => {
             {/* Goal Filter */}
             <Select
               value={filterGoalId}
-              onValueChange={setFilterGoalId}
+              onChange={(e) => setFilterGoalId(e.target.value)}
             >
               <option value="all">Todos los Objetivos</option>
               {goals.map(goal => (
@@ -156,7 +156,7 @@ export const PostMortemsPage = () => {
             {/* Date Range Filter */}
             <Select
               value={filterDateRange}
-              onValueChange={(value) => setFilterDateRange(value as any)}
+              onChange={(e) => setFilterDateRange(e.target.value as 'all' | 'week' | 'month' | '3months')}
             >
               <option value="all">Todo el Tiempo</option>
               <option value="week">Última Semana</option>

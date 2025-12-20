@@ -4,7 +4,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from './supabase';
-import type { Trade, Routine, Settings, TradeTemplate, TradingSetup, DailyRoutineExecution, TradingGoal } from '@/types/Trading';
+import type { Trade, Routine, Settings, TradeTemplate, TradingSetup, TradingGoal } from '@/types/Trading';
 
 /**
  * Get current user ID from Supabase Auth
@@ -225,7 +225,7 @@ export const supabaseSettingsStorage = {
       theme: data.theme,
       customTheme: data.custom_theme,
       advanced: data.advanced_settings,
-      tradingRules: data.trading_rules,
+      // tradingRules is now in advanced.tradingRules
     } as Settings;
   },
   
@@ -247,7 +247,7 @@ export const supabaseSettingsStorage = {
         theme: settings.theme,
         custom_theme: settings.customTheme,
         advanced_settings: settings.advanced,
-        trading_rules: settings.tradingRules,
+        // trading_rules is now in advanced_settings.tradingRules
       }, { onConflict: 'user_id' });
     
     if (error) throw error;

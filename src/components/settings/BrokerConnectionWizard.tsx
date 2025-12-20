@@ -12,12 +12,9 @@ import { Select } from '@/components/ui/Select';
 import { useToast } from '@/components/ui/use-toast';
 import {
   createBrokerAccount,
-  getBrokerAccounts,
-  type BrokerAccount,
   type BrokerInfo,
   type IntegrationType,
   type AccountType,
-  getAccountStatusDisplay,
 } from '@/lib/supabaseBrokerAccounts';
 import { BrokerSelector } from './BrokerSelector';
 import { ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Info as InfoIcon, Loader2, Eye, EyeOff } from 'lucide-react';

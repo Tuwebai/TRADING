@@ -22,7 +22,7 @@ export async function uploadFile(
     // Upload file to user's folder: {userId}/{path}
     const filePath = `${userId}/${path}`;
     
-    const { data, error } = await supabase!
+    const { error } = await supabase!
       .storage
       .from(BUCKET_NAME)
       .upload(filePath, file, {

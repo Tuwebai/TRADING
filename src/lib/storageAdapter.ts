@@ -26,16 +26,7 @@ async function getUserId(): Promise<string | null> {
   return user.id;
 }
 
-/**
- * Require user ID - Throws error if not authenticated (for operations that MUST have user)
- */
-async function requireUserId(): Promise<string> {
-  const userId = await getUserId();
-  if (!userId) {
-    throw new Error('Usuario no autenticado. Por favor inicia sesión.');
-  }
-  return userId;
-}
+// requireUserId function removed - not used
 
 /**
  * Storage Adapter - SOLO Supabase

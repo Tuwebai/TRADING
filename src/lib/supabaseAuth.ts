@@ -214,7 +214,7 @@ export function onAuthStateChange(callback: (user: AuthUser | null) => void) {
     return () => {};
   }
   
-  const { data: { subscription } } = supabase!.auth.onAuthStateChange((event, session) => {
+  const { data: { subscription } } = supabase!.auth.onAuthStateChange((_event, session) => {
     if (session?.user) {
       callback({
         id: session.user.id,

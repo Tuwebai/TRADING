@@ -25,9 +25,17 @@ export interface NotificationOptions {
   silent?: boolean;
   vibrate?: number[];
   data?: Record<string, any>;
-  actions?: NotificationAction[];
+  actions?: Array<{ action: string; title: string; icon?: string }>;
   url?: string;
 }
+
+// Type for browser Notification API (extends standard NotificationOptions)
+type BrowserNotificationOptions = Omit<NotificationOptions, 'title' | 'body'> & {
+  dir?: 'auto' | 'ltr' | 'rtl';
+  lang?: string;
+  renotify?: boolean;
+  sticky?: boolean;
+};
 
 export interface NotificationPreferences {
   enabled: boolean;
@@ -186,7 +194,7 @@ export async function showNotification(
   const preferences = loadNotificationPreferences();
 
   // Prepare notification options
-  const notificationOptions: NotificationOptions = {
+  const notificationOptions: BrowserNotificationOptions = {
     icon: options.icon || '/vite.svg',
     badge: options.badge || '/vite.svg',
     tag: options.tag || type,
@@ -199,7 +207,13 @@ export async function showNotification(
       url: options.url || '/',
       timestamp: Date.now(),
     },
-    actions: options.actions,
+    ...(options.actions && {
+      actions: options.actions.map(a => ({
+        action: a.action,
+        title: a.title,
+        ...(a.icon && { icon: a.icon }),
+      })),
+    }),
   };
 
   // Try to use Service Worker notification first

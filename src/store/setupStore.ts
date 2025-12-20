@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import type { TradingSetup } from '@/types/Trading';
-import { setupStorage } from '@/lib/storage';
+// setupStorage not used - using storageAdapter instead
 import { storageAdapter } from '@/lib/storageAdapter';
 import { generateId } from '@/lib/utils';
 import { calculateAnalytics } from '@/lib/calculations';

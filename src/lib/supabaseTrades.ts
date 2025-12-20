@@ -5,35 +5,8 @@
 
 import { supabase, isSupabaseConfigured } from './supabase';
 import type { Trade } from '@/types/Trading';
-import { useTradingModeStore } from '@/store/tradingModeStore';
 
-/**
- * Database trade structure from Supabase
- */
-interface SupabaseTrade {
-  id: number;
-  ticket: string;
-  trade_uid: string;
-  account_mode: 'simulation' | 'demo' | 'live';
-  broker: string | null;
-  symbol: string;
-  side: 'buy' | 'sell';
-  volume: number;
-  price_open: number;
-  price_close: number | null;
-  stop_loss: number | null;
-  take_profit: number | null;
-  pnl: number | null;
-  commission: number;
-  swap: number;
-  result: 'win' | 'loss' | 'breakeven' | null;
-  r_multiple: number | null;
-  opened_at: string;
-  closed_at: string | null;
-  duration_seconds: number | null;
-  created_at: string;
-  updated_at: string;
-}
+// SupabaseTrade interface removed - not used in code
 
 /**
  * Map Supabase trade to frontend Trade format
@@ -211,15 +184,5 @@ export async function syncTradesFromSupabase(
   }
 }
 
-/**
- * Get the current account mode from settings
- */
-function getCurrentAccountMode(): 'simulation' | 'demo' | 'live' | undefined {
-  const mode = useTradingModeStore.getState().mode;
-  // Map frontend mode to Supabase account_mode
-  if (mode === 'simulation') return 'simulation';
-  if (mode === 'demo') return 'demo';
-  if (mode === 'live') return 'live';
-  return undefined;
-}
+// getCurrentAccountMode function removed - not used
 

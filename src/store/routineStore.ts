@@ -161,7 +161,7 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
       if (localExecution) {
         execution = localExecution;
       } else {
-        execution = getTodayExecution();
+        execution = getTodayExecutionLocal();
         routineExecutionStorage.save(execution);
       }
     }

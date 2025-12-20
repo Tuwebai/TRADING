@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import type { TradeTemplate, TradeFormData } from '@/types/Trading';
-import { templateStorage } from '@/lib/storage';
+// templateStorage not used - using storageAdapter instead
 import { storageAdapter } from '@/lib/storageAdapter';
 import { generateId } from '@/lib/utils';
 

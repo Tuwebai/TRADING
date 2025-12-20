@@ -4,7 +4,6 @@
 
 import { supabase, isSupabaseConfigured } from './supabase';
 import { tradeStorage, settingsStorage, templateStorage } from './storage';
-import type { Trade, Settings, TradeTemplate } from '@/types/Trading';
 
 /**
  * Check if user wants to use Supabase (has authenticated)
@@ -121,7 +120,7 @@ export async function migrateToSupabase(): Promise<{
           theme: localSettings.theme,
           custom_theme: localSettings.customTheme,
           advanced_settings: localSettings.advanced,
-          trading_rules: localSettings.tradingRules,
+          // trading_rules is now in advanced_settings.tradingRules
         }, { onConflict: 'user_id' });
       
       if (!error) {

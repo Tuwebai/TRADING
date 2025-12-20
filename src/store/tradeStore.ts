@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import type { Trade, TradeFormData, TradeFilters } from '@/types/Trading';
-import { tradeStorage } from '@/lib/storage';
+// tradeStorage not used - using storageAdapter instead
 import { storageAdapter } from '@/lib/storageAdapter';
 import { calculatePNL, calculateRR } from '@/lib/calculations';
 import { calculateTradePips, isForexPair, calculateSwap } from '@/lib/forexCalculations';
@@ -107,7 +107,14 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       // Don't filter by mode here - load all trades and filter in UI
       try {
         const syncedTrades = await syncTradesFromSupabase(processedTrades);
-        processedTrades = syncedTrades;
+        // Ensure all pips and swap fields are number | null (not undefined)
+        processedTrades = syncedTrades.map(trade => ({
+          ...trade,
+          pips: trade.pips ?? null,
+          riskPips: trade.riskPips ?? null,
+          rewardPips: trade.rewardPips ?? null,
+          swap: trade.swap ?? null,
+        }));
         
         // Recalculate metrics for all trades (including Supabase trades)
         processedTrades = processedTrades.map(trade => {
@@ -126,9 +133,9 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
             riskReward: trade.riskReward !== null && trade.riskReward !== undefined 
               ? trade.riskReward 
               : calculateRR(trade),
-            pips: pips?.totalPips || null,
-            riskPips: pips?.riskPips || null,
-            rewardPips: pips?.rewardPips || null,
+            pips: pips?.totalPips ?? null,
+            riskPips: pips?.riskPips ?? null,
+            rewardPips: pips?.rewardPips ?? null,
             swap: swap || trade.swap || null,
           };
         });
@@ -145,7 +152,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       // Subscribe to realtime updates
       const user = await getSupabaseUser();
       if (user?.id) {
-        const unsubscribe = subscribeToTrades(
+        subscribeToTrades(
           user.id,
           // onInsert
           (newTrade) => {
